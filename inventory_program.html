@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Barcode Inventory</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #172033; background: #f7f8fa; }
+    body { max-width: 1160px; margin: 36px auto; padding: 0 18px; }
+    h1 { margin-bottom: 6px; } h2 { font-size: 1.1rem; margin: 28px 0 0; }
+    .note { color: #526071; margin-top: 0; }
+    .scanner, .linker, .filters, .controls, .type-manager { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+    input, select, button { font: inherit; padding: 10px 12px; border-radius: 7px; }
+    input, select { border: 1px solid #b9c2cf; min-width: 0; background: white; }
+    #barcode { flex: 1 1 320px; } .linker select { flex: 1 1 260px; } .linker input { flex: 1 1 230px; }
+    .type-manager input { flex: 1 1 230px; }
+    button { border: 0; background: #1769e0; color: #fff; cursor: pointer; }
+    button:hover { background: #0d56bd; } button.secondary, .unlink { background: #637083; }
+    .unlink { margin: 2px 4px 2px 0; padding: 4px 7px; font-size: .82em; }
+    .filters { align-items: center; padding: 13px; background: #eef4fc; border-radius: 10px; }
+    .filters label { font-weight: 600; }
+    .table-wrap { overflow-x: auto; background: #fff; border: 1px solid #dde3ec; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 930px; }
+    th, td { padding: 12px; border-bottom: 1px solid #e7ebf1; text-align: left; vertical-align: top; }
+    th { background: #f1f4f8; } td input, td select { width: 100%; box-sizing: border-box; }
+    td.qty { width: 100px; } td.type { width: 160px; } td.actions { width: 100px; }
+    .aliases { color: #4c5a6b; font-size: .92em; line-height: 1.45; }
+    .empty { padding: 24px; text-align: center; color: #6d7887; } .status { min-height: 1.25em; margin: 12px 0 0; color: #1769e0; }
+  </style>
+</head>
+<body>
+  <h1>Barcode Inventory</h1>
+  <p class="note">Scan a barcode to add one quantity. Linked barcodes share one quantity. You can assign an item type, filter the list by type, and sort displayed items by quantity.</p>
+
+  <form id="scanForm" class="scanner">
+    <input id="barcode" type="text" autocomplete="off" inputmode="numeric" placeholder="Scan or enter barcode" autofocus required>
+    <button type="submit">Add / Scan</button>
+  </form>
+  <p id="status" class="status" aria-live="polite"></p>
+
+  <h2>Item types</h2>
+  <form id="typeForm" class="type-manager">
+    <input id="newType" type="text" placeholder="New type, e.g. Clothing or Electronics" required>
+    <button type="submit">Add item type</button>
+  </form>
+
+  <h2>Link another barcode to an item</h2>
+  <form id="linkForm" class="linker">
+    <select id="entrySelect" required></select>
+    <input id="linkedBarcode" type="text" autocomplete="off" inputmode="numeric" placeholder="Scan or enter additional barcode" required>
+    <button type="submit">Link barcode</button>
+  </form>
+
+  <div class="filters">
+    <label for="typeFilter">Filter by type:</label>
+    <select id="typeFilter"></select>
+    <label for="qtySort">Sort by quantity:</label>
+    <select id="qtySort">
+      <option value="default">Default order</option>
+      <option value="high">High to low</option>
+      <option value="low">Low to high</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Primary barcode</th><th>Linked barcodes</th><th>Item description</th><th>Item type</th><th>Qty</th><th>Action</th></tr></thead>
+      <tbody id="inventoryRows"></tbody>
+    </table>
+    <div id="empty" class="empty">No matching inventory items. Scan a barcode to begin or change the filter.</div>
+  </div>
+
+  <div class="controls">
+    <button id="exportBtn" type="button" class="secondary">Export CSV</button>
+    <button id="clearBtn" type="button" class="secondary">Clear inventory</button>
+  </div>
+
+  <script>
+    function normalize(data) {
+      return (Array.isArray(data) ? data : []).map(item => ({
+        barcode: String(item.barcode || '').trim(), aliases: Array.isArray(item.aliases) ? item.aliases.map(String).filter(Boolean) : [],
+        description: String(item.description || ''), type: String(item.type || ''), qty: Math.max(0, Number.parseInt(item.qty, 10) || 0)
+      })).filter(item => item.barcode);
+    }
+    let inventory = [];
+    let itemTypes = [];
+    const rows = document.getElementById('inventoryRows'), barcodeInput = document.getElementById('barcode'), status = document.getElementById('status');
+    const entrySelect = document.getElementById('entrySelect'), typeFilter = document.getElementById('typeFilter'), qtySort = document.getElementById('qtySort');
+    let saveQueue = Promise.resolve();
+    function save() {
+      const snapshot = JSON.stringify({inventory, itemTypes});
+      saveQueue = saveQueue.then(async () => {
+        const response = await fetch('/api/data', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: snapshot});
+        if (!response.ok) throw new Error('Could not save inventory');
+      }).catch(error => { status.textContent = error.message; });
+    }
+    function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+    function findEntry(barcode) { return inventory.find(item => item.barcode === barcode || item.aliases.includes(barcode)); }
+    function label(item) { return `${item.barcode} — ${item.description.trim() || 'No description'} (Qty: ${item.qty})`; }
+    function typeOptions(selected = '', includeBlank = true) { return `${includeBlank ? '<option value="">No type</option>' : ''}${itemTypes.map(type => `<option value="${escapeHtml(type)}" ${type === selected ? 'selected' : ''}>${escapeHtml(type)}</option>`).join('')}`; }
+    function render() {
+      const selectedFilter = typeFilter.value;
+      typeFilter.innerHTML = '<option value="all">All item types</option><option value="">No type</option>' + itemTypes.map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join('');
+      typeFilter.value = [...typeFilter.options].some(o => o.value === selectedFilter) ? selectedFilter : 'all';
+      let display = inventory.map((item, index) => ({item, index}));
+      if (typeFilter.value !== 'all') display = display.filter(x => x.item.type === typeFilter.value);
+      if (qtySort.value === 'high') display.sort((a,b) => b.item.qty - a.item.qty || a.index - b.index);
+      if (qtySort.value === 'low') display.sort((a,b) => a.item.qty - b.item.qty || a.index - b.index);
+      rows.innerHTML = display.map(({item, index}) => `
+        <tr>
+          <td>${escapeHtml(item.barcode)}</td>
+          <td class="aliases">${item.aliases.length ? item.aliases.map(alias => `<div>${escapeHtml(alias)} <button type="button" class="unlink" data-unlink-entry="${index}" data-unlink-barcode="${escapeHtml(alias)}">Unlink</button></div>`).join('') : '—'}</td>
+          <td><input data-index="${index}" data-field="description" value="${escapeHtml(item.description)}" placeholder="Enter item description"></td>
+          <td class="type"><select data-index="${index}" data-field="type">${typeOptions(item.type)}</select></td>
+          <td class="qty"><input data-index="${index}" data-field="qty" type="number" min="0" step="1" value="${item.qty}"></td>
+          <td class="actions"><button type="button" class="secondary" data-delete="${index}">Delete</button></td>
+        </tr>`).join('');
+      entrySelect.innerHTML = inventory.length ? inventory.map((item, index) => `<option value="${index}">${escapeHtml(label(item))}</option>`).join('') : '<option value="">Add an item first</option>';
+      entrySelect.disabled = inventory.length === 0; document.querySelector('#linkForm button').disabled = inventory.length === 0;
+      document.getElementById('empty').hidden = display.length > 0;
+    }
+    function addBarcode(rawBarcode) {
+      const barcode = rawBarcode.trim(); if (!barcode) return;
+      const existing = findEntry(barcode);
+      if (existing) { existing.qty += 1; status.textContent = `Added 1 to ${existing.barcode}. Shared quantity is now ${existing.qty}.`; }
+      else { inventory.push({barcode, aliases: [], description: '', type: '', qty: 1}); status.textContent = `Added new barcode ${barcode} with a quantity of 1.`; }
+      save(); render(); barcodeInput.value = ''; barcodeInput.focus();
+    }
+    document.getElementById('scanForm').addEventListener('submit', e => { e.preventDefault(); addBarcode(barcodeInput.value); });
+    document.getElementById('typeForm').addEventListener('submit', e => {
+      e.preventDefault(); const type = document.getElementById('newType').value.trim();
+      if (!type) return;
+      if (itemTypes.some(x => x.toLowerCase() === type.toLowerCase())) status.textContent = `Item type “${type}” already exists.`;
+      else { itemTypes.push(type); itemTypes.sort((a,b) => a.localeCompare(b)); save(); render(); status.textContent = `Added item type “${type}”.`; }
+      document.getElementById('newType').value = '';
+    });
+    document.getElementById('linkForm').addEventListener('submit', e => {
+      e.preventDefault(); const index = Number(entrySelect.value), barcode = document.getElementById('linkedBarcode').value.trim();
+      if (!barcode || !inventory[index]) return;
+      const existing = findEntry(barcode);
+      if (existing) status.textContent = `Barcode ${barcode} is already linked to primary barcode ${existing.barcode}.`;
+      else { inventory[index].aliases.push(barcode); save(); render(); status.textContent = `Linked ${barcode} to ${inventory[index].barcode}.`; }
+      document.getElementById('linkedBarcode').value = '';
+    });
+    rows.addEventListener('change', e => {
+      const input = e.target, index = Number(input.dataset.index); if (!Number.isInteger(index) || !inventory[index]) return;
+      if (input.dataset.field === 'qty') inventory[index].qty = Math.max(0, Number.parseInt(input.value, 10) || 0);
+      if (input.dataset.field === 'description') inventory[index].description = input.value;
+      if (input.dataset.field === 'type') inventory[index].type = input.value;
+      save(); render();
+    });
+    rows.addEventListener('click', e => {
+      const button = e.target;
+      if (button.dataset.unlinkEntry !== undefined) {
+        const index = Number(button.dataset.unlinkEntry), barcode = button.dataset.unlinkBarcode; if (!inventory[index]) return;
+        inventory[index].aliases = inventory[index].aliases.filter(alias => alias !== barcode); save(); render(); status.textContent = `Unlinked ${barcode} from ${inventory[index].barcode}.`; return;
+      }
+      if (button.dataset.delete !== undefined) { inventory.splice(Number(button.dataset.delete), 1); save(); render(); status.textContent = 'Item deleted.'; }
+    });
+    typeFilter.addEventListener('change', render); qtySort.addEventListener('change', render);
+    document.getElementById('clearBtn').addEventListener('click', () => { if (!confirm('Clear all inventory items and linked barcodes?')) return; inventory = []; save(); render(); status.textContent = 'Inventory cleared.'; });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const quote = value => '"' + String(value).replace(/"/g, '""') + '"';
+      const csv = ['Primary Barcode,Linked Barcodes,Description,Item Type,Qty', ...inventory.map(x => [x.barcode, x.aliases.join(' | '), x.description, x.type, x.qty].map(quote).join(','))].join('\n');
+      const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'})); link.download = 'inventory.csv'; link.click(); URL.revokeObjectURL(link.href);
+    });
+    async function load() {
+      try {
+        const response = await fetch('/api/data');
+        if (!response.ok) throw new Error('Could not load inventory');
+        const data = await response.json();
+        inventory = normalize(data.inventory);
+        itemTypes = [...new Set((Array.isArray(data.itemTypes) ? data.itemTypes : []).map(x => String(x).trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+      } catch (error) {
+        status.textContent = error.message;
+      }
+      render();
+    }
+    load();
+  </script>
+</body>
+</html>
