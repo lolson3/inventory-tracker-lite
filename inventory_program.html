@@ -4,29 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Barcode Inventory</title>
-  <style>
-    :root { font-family: Arial, sans-serif; color: #172033; background: #f7f8fa; }
-    body { max-width: 1160px; margin: 36px auto; padding: 0 18px; }
-    h1 { margin-bottom: 6px; } h2 { font-size: 1.1rem; margin: 28px 0 0; }
-    .note { color: #526071; margin-top: 0; }
-    .scanner, .linker, .filters, .controls, .type-manager { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
-    input, select, button { font: inherit; padding: 10px 12px; border-radius: 7px; }
-    input, select { border: 1px solid #b9c2cf; min-width: 0; background: white; }
-    #barcode { flex: 1 1 320px; } .linker select { flex: 1 1 260px; } .linker input { flex: 1 1 230px; }
-    .type-manager input { flex: 1 1 230px; }
-    button { border: 0; background: #1769e0; color: #fff; cursor: pointer; }
-    button:hover { background: #0d56bd; } button.secondary, .unlink { background: #637083; }
-    .unlink { margin: 2px 4px 2px 0; padding: 4px 7px; font-size: .82em; }
-    .filters { align-items: center; padding: 13px; background: #eef4fc; border-radius: 10px; }
-    .filters label { font-weight: 600; }
-    .table-wrap { overflow-x: auto; background: #fff; border: 1px solid #dde3ec; border-radius: 10px; }
-    table { width: 100%; border-collapse: collapse; min-width: 930px; }
-    th, td { padding: 12px; border-bottom: 1px solid #e7ebf1; text-align: left; vertical-align: top; }
-    th { background: #f1f4f8; } td input, td select { width: 100%; box-sizing: border-box; }
-    td.qty { width: 100px; } td.type { width: 160px; } td.actions { width: 100px; }
-    .aliases { color: #4c5a6b; font-size: .92em; line-height: 1.45; }
-    .empty { padding: 24px; text-align: center; color: #6d7887; } .status { min-height: 1.25em; margin: 12px 0 0; color: #1769e0; }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <h1>Barcode Inventory</h1>
@@ -52,8 +30,11 @@
   </form>
 
   <div class="filters">
-    <label for="typeFilter">Filter by type:</label>
-    <select id="typeFilter"></select>
+    <label for="typeFilterButton">Filter by type:</label>
+    <div id="typeFilter" class="filter-dropdown">
+      <button id="typeFilterButton" type="button" class="filter-trigger" aria-haspopup="listbox" aria-expanded="false"></button>
+      <div id="typeFilterMenu" class="filter-menu" role="listbox" hidden></div>
+    </div>
     <label for="qtySort">Sort by quantity:</label>
     <select id="qtySort">
       <option value="default">Default order</option>
@@ -85,7 +66,8 @@
     let inventory = [];
     let itemTypes = [];
     const rows = document.getElementById('inventoryRows'), barcodeInput = document.getElementById('barcode'), status = document.getElementById('status');
-    const entrySelect = document.getElementById('entrySelect'), typeFilter = document.getElementById('typeFilter'), qtySort = document.getElementById('qtySort');
+    const entrySelect = document.getElementById('entrySelect'), typeFilter = document.getElementById('typeFilter'), typeFilterButton = document.getElementById('typeFilterButton'), typeFilterMenu = document.getElementById('typeFilterMenu'), qtySort = document.getElementById('qtySort');
+    let selectedTypeFilter = 'all';
     let saveQueue = Promise.resolve();
     function save() {
       const snapshot = JSON.stringify({inventory, itemTypes});
@@ -99,11 +81,12 @@
     function label(item) { return `${item.barcode} — ${item.description.trim() || 'No description'} (Qty: ${item.qty})`; }
     function typeOptions(selected = '', includeBlank = true) { return `${includeBlank ? '<option value="">No type</option>' : ''}${itemTypes.map(type => `<option value="${escapeHtml(type)}" ${type === selected ? 'selected' : ''}>${escapeHtml(type)}</option>`).join('')}`; }
     function render() {
-      const selectedFilter = typeFilter.value;
-      typeFilter.innerHTML = '<option value="all">All item types</option><option value="">No type</option>' + itemTypes.map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join('');
-      typeFilter.value = [...typeFilter.options].some(o => o.value === selectedFilter) ? selectedFilter : 'all';
+      if (selectedTypeFilter !== 'all' && selectedTypeFilter !== '' && !itemTypes.includes(selectedTypeFilter)) selectedTypeFilter = 'all';
+      typeFilterButton.textContent = selectedTypeFilter === 'all' ? 'All item types' : selectedTypeFilter;
+      const filterOption = (value, label) => `<button type="button" class="filter-choice" role="option" aria-selected="${selectedTypeFilter === value}" data-filter-type="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
+      typeFilterMenu.innerHTML = filterOption('all', 'All item types') + itemTypes.map((type, index) => `<div class="filter-option">${filterOption(type, type)}<button type="button" class="delete-type" data-delete-type="${index}" aria-label="Remove ${escapeHtml(type)}" title="Remove type"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg></button></div>`).join('');
       let display = inventory.map((item, index) => ({item, index}));
-      if (typeFilter.value !== 'all') display = display.filter(x => x.item.type === typeFilter.value);
+      if (selectedTypeFilter !== 'all') display = display.filter(x => x.item.type === selectedTypeFilter);
       if (qtySort.value === 'high') display.sort((a,b) => b.item.qty - a.item.qty || a.index - b.index);
       if (qtySort.value === 'low') display.sort((a,b) => a.item.qty - b.item.qty || a.index - b.index);
       rows.innerHTML = display.map(({item, index}) => `
@@ -134,6 +117,23 @@
       else { itemTypes.push(type); itemTypes.sort((a,b) => a.localeCompare(b)); save(); render(); status.textContent = `Added item type “${type}”.`; }
       document.getElementById('newType').value = '';
     });
+    typeFilterButton.addEventListener('click', () => {
+      const isOpen = !typeFilterMenu.hidden; typeFilterMenu.hidden = isOpen; typeFilterButton.setAttribute('aria-expanded', String(!isOpen));
+    });
+    typeFilterMenu.addEventListener('click', e => {
+      const choice = e.target.closest('[data-filter-type]');
+      if (choice) { selectedTypeFilter = choice.dataset.filterType; typeFilterMenu.hidden = true; typeFilterButton.setAttribute('aria-expanded', 'false'); render(); return; }
+      const button = e.target.closest('[data-delete-type]'); if (!button) return;
+      const index = Number(button.dataset.deleteType), type = itemTypes[index]; if (type === undefined) return;
+      const assignedCount = inventory.filter(item => item.type === type).length;
+      const warning = assignedCount ? `Remove “${type}”? ${assignedCount} item${assignedCount === 1 ? '' : 's'} will be changed to No type.` : `Remove “${type}”?`;
+      if (!confirm(warning)) return;
+      inventory.forEach(item => { if (item.type === type) item.type = ''; });
+      itemTypes.splice(index, 1); save(); render(); status.textContent = `Removed item type “${type}”.`;
+    });
+    document.addEventListener('click', e => {
+      if (!typeFilter.contains(e.target)) { typeFilterMenu.hidden = true; typeFilterButton.setAttribute('aria-expanded', 'false'); }
+    });
     document.getElementById('linkForm').addEventListener('submit', e => {
       e.preventDefault(); const index = Number(entrySelect.value), barcode = document.getElementById('linkedBarcode').value.trim();
       if (!barcode || !inventory[index]) return;
@@ -157,7 +157,7 @@
       }
       if (button.dataset.delete !== undefined) { inventory.splice(Number(button.dataset.delete), 1); save(); render(); status.textContent = 'Item deleted.'; }
     });
-    typeFilter.addEventListener('change', render); qtySort.addEventListener('change', render);
+    qtySort.addEventListener('change', render);
     document.getElementById('clearBtn').addEventListener('click', () => { if (!confirm('Clear all inventory items and linked barcodes?')) return; inventory = []; save(); render(); status.textContent = 'Inventory cleared.'; });
     document.getElementById('exportBtn').addEventListener('click', () => {
       const quote = value => '"' + String(value).replace(/"/g, '""') + '"';

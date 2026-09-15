@@ -19,9 +19,11 @@ type InventoryData = {
 const root = dirname(fileURLToPath(import.meta.url));
 const projectRoot = root.endsWith('dist') ? dirname(root) : root;
 const htmlPath = join(projectRoot, 'inventory_program.html');
+const cssPath = join(projectRoot, 'styles.css');
 const dataDir = join(projectRoot, 'data');
 const dataPath = join(dataDir, 'inventory.json');
-const port = Number(process.env.PORT) || 3000;
+const host = '0.0.0.0';
+const port = Number(process.env.PORT) || 3001;
 const emptyData: InventoryData = { inventory: [], itemTypes: [] };
 
 async function readData(): Promise<InventoryData> {
@@ -58,6 +60,11 @@ export const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === 'GET' && request.url === '/styles.css') {
+      send(response, 200, await readFile(cssPath, 'utf8'), 'text/css; charset=utf-8');
+      return;
+    }
+
     if (request.url === '/api/data' && request.method === 'GET') {
       send(response, 200, JSON.stringify(await readData()), 'application/json');
       return;
@@ -76,6 +83,6 @@ export const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`Inventory tracker running at http://localhost:${port}`);
+server.listen(port, host, () => {
+  console.log(`Inventory tracker listening on http://${host}:${port}`);
 });
