@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { config } from './src/config.js';
-import { Store } from './src/storage.js';
-import { createApp } from './src/http.js';
+import { config } from './config.js';
+import { Store } from './storage.js';
+import { createApp } from './http.js';
 
 // This entry point runs only after compilation into dist/.
 const root = fileURLToPath(new URL('../', import.meta.url));

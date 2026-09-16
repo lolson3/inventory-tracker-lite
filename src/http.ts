@@ -61,7 +61,10 @@ export function createApp(options: {
       'dist/client/controller.js',
       'text/javascript; charset=utf-8',
     ],
-    '/csv.js': ['dist/client/csv.js', 'text/javascript; charset=utf-8'],
+    '/csv.js': ['dist/client/csv.js', 'text/javascript; charset=utf-8'],  '/img/inventory-favicon-16x16.png': [
+    'img/inventory-favicon-16x16.png',
+    'image/png',
+  ],
   };
   let windowStart = Date.now(),
     requests = 0;
