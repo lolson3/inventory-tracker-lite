@@ -59,6 +59,7 @@ test('security headers, explicit static routes, method restrictions and host/ori
     '/utils/csv.js',
     '/components/dropdown.js',
     '/components/scanning.js',
+    '/components/theme.js',
   ])
     assert.equal((await fetch(f.base + path)).status, 200);
   for (const path of [

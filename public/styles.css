@@ -8,6 +8,11 @@
   color: #172033;
   background: #f7f8fa;
 }
+html {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
 body {
   margin: 0;
 }
@@ -63,6 +68,31 @@ h1 {
   color: #637083;
   font-size: 0.9rem;
   line-height: 1.5;
+}
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  padding: 0;
+  color: #315e98;
+  background: #eef4fc;
+  border: 1px solid #cbd8e8;
+  border-radius: 50%;
+}
+.theme-toggle:hover {
+  color: #174c94;
+  background: #dce9fa;
+}
+.theme-toggle:focus-visible {
+  outline: 3px solid #1769e0;
+  outline-offset: 3px;
+}
+.theme-toggle svg {
+  width: 22px;
+  height: 22px;
 }
 @media (max-width: 480px) {
   .header-content {
@@ -510,4 +540,93 @@ button.danger:hover {
 }
 #batchStatus:empty {
   display: none;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  color: #e5eaf2;
+  background: #0f1724;
+}
+html[data-theme='dark'] .app-header {
+  background: #141e2d;
+  border-color: #334155;
+}
+html[data-theme='dark'] .app-mark {
+  color: #93b8ec;
+  background: #203653;
+}
+html[data-theme='dark'] .app-heading h1 span,
+html[data-theme='dark'] .app-heading p,
+html[data-theme='dark'] .note,
+html[data-theme='dark'] .aliases,
+html[data-theme='dark'] .empty,
+html[data-theme='dark'] .barcode-option small {
+  color: #aab7c8;
+}
+html[data-theme='dark'] .theme-toggle {
+  color: #f7c948;
+  background: #29354a;
+  border-color: #475569;
+}
+html[data-theme='dark'] .theme-toggle:hover {
+  color: #ffe08a;
+  background: #35445c;
+}
+html[data-theme='dark'] input,
+html[data-theme='dark'] select,
+html[data-theme='dark'] .filter-trigger {
+  color: #e5eaf2;
+  background: #111b2a;
+  border-color: #526176;
+}
+html[data-theme='dark'] .filters {
+  background: #18263a;
+}
+html[data-theme='dark'] .table-wrap,
+html[data-theme='dark'] .filter-menu,
+html[data-theme='dark'] .type-overlay,
+html[data-theme='dark'] .confirmation-card {
+  background: #141e2d;
+  border-color: #3a485c;
+}
+html[data-theme='dark'] th {
+  background: #1d2a3d;
+}
+html[data-theme='dark'] th,
+html[data-theme='dark'] td,
+html[data-theme='dark'] #batchScans li {
+  border-color: #334155;
+}
+html[data-theme='dark'] .filter-trigger:hover,
+html[data-theme='dark'] .filter-choice:hover,
+html[data-theme='dark'] .filter-choice[aria-pressed='true'],
+html[data-theme='dark'] .sort-button:hover {
+  background: #26364d;
+}
+html[data-theme='dark'] .filter-choice,
+html[data-theme='dark'] .sort-button {
+  color: #e5eaf2;
+}
+html[data-theme='dark'] .delete-type {
+  color: #aab7c8;
+}
+html[data-theme='dark'] .delete-type:hover {
+  color: #ff9b94;
+  background: #4b2528;
+}
+html[data-theme='dark'] .edit-description {
+  color: #c5cfdd;
+  background: #334155;
+}
+html[data-theme='dark'] .edit-description:hover {
+  background: #46566d;
+}
+html[data-theme='dark'] .scan-actions #addInventory {
+  color: #8dbcf8;
+}
+html[data-theme='dark'] .scan-actions #removeInventory {
+  color: #f3a09a;
+}
+html[data-theme='dark'] .confirmation-backdrop {
+  background: rgba(2, 6, 15, 0.68);
 }

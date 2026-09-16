@@ -13,6 +13,7 @@ Built with TypeScript, Node.js, and a browser frontend. No separate database ser
 - **CSV import and export:** download inventory for use in spreadsheets or replace it from an exported CSV.
 - **Reliable saves:** transactional storage, conflict detection, and safe retries protect against lost updates and duplicate scans.
 - **Local or LAN access:** localhost by default, with HTTPS proxy configuration for a private network.
+- **Light and dark themes:** switch themes from the header and keep the preference between visits.
 
 ## Requirements
 

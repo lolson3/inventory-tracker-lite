@@ -57,6 +57,10 @@ export function createApp(options: {
       'dist/client/components/dropdown.js',
       'text/javascript; charset=utf-8',
     ],
+    '/components/theme.js': [
+      'dist/client/components/theme.js',
+      'text/javascript; charset=utf-8',
+    ],
     '/controller.js': [
       'dist/client/controller.js',
       'text/javascript; charset=utf-8',

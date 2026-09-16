@@ -1,5 +1,6 @@
 import { mountScanning } from './components/scanning.js';
 import { closeDropdown, mountDropdowns } from './components/dropdown.js';
+import { mountThemeToggle } from './components/theme.js';
 import { Controller } from './controller.js';
 import { exportCsv, importCsv } from './utils/csv.js';
 import type { Operation, State } from '../server/model.js';
@@ -8,6 +9,7 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
   const element = <T extends HTMLElement>(id: string) =>
     doc.getElementById(id) as T;
   mountDropdowns(doc);
+  mountThemeToggle(doc);
   const rows = element<HTMLTableSectionElement>('inventoryRows');
   const editor = element<HTMLFieldSetElement>('editor');
   let scanning: ReturnType<typeof mountScanning> | undefined;

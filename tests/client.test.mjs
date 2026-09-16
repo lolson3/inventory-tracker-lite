@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { Controller } from '../dist/client/controller.js';
 import { mount } from '../dist/client/app.js';
+import { mountThemeToggle } from '../dist/client/components/theme.js';
 import { csvCell, exportCsv, importCsv } from '../dist/client/utils/csv.js';
 const html = readFileSync('public/index.html', 'utf8');
 const empty = () => ({ revision: 0, inventory: [], itemTypes: [] });
@@ -13,6 +14,22 @@ const response = (body, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('theme button toggles and persists dark mode', (t) => {
+  const dom = new JSDOM(html, { url: 'http://localhost' });
+  t.after(() => dom.window.close());
+  const doc = dom.window.document;
+  dom.window.localStorage.setItem('inventory-theme', 'dark');
+  mountThemeToggle(doc);
+  const button = doc.getElementById('themeToggle');
+  assert.equal(doc.documentElement.dataset.theme, 'dark');
+  assert.equal(button.getAttribute('aria-pressed'), 'true');
+  assert.equal(button.getAttribute('aria-label'), 'Switch to light mode');
+  button.click();
+  assert.equal(doc.documentElement.dataset.theme, 'light');
+  assert.equal(dom.window.localStorage.getItem('inventory-theme'), 'light');
+  assert.equal(button.getAttribute('aria-label'), 'Switch to dark mode');
+});
 
 test('controller blocks mutations before loading and after a failed load', async () => {
   let requests = 0;
