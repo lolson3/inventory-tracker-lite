@@ -10,8 +10,6 @@ export function config(env: NodeJS.ProcessEnv = process.env) {
     if (url.origin !== publicOrigin || url.protocol !== 'https:')
       throw new Error('PUBLIC_ORIGIN must be an HTTPS origin without a path');
   }
-  if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !publicOrigin)
-    throw new Error('LAN binding requires HTTPS PUBLIC_ORIGIN');
   return {
     host,
     port: Number(rawPort),

@@ -78,13 +78,19 @@ Stop the app before switching `DATA_DIR` to the restored directory. Do not copy 
 
 ## Hosting on Debian
 
-The default listen address is `127.0.0.1`, so the app is accessible only from the server itself. For LAN access, put it behind an HTTPS reverse proxy and set `HOST=0.0.0.0` together with a matching `PUBLIC_ORIGIN`.
+The default listen address is `127.0.0.1`, so the app is accessible only from the server itself. Containers set `HOST=0.0.0.0` and can be reached directly on the trusted LAN without `PUBLIC_ORIGIN`. When using an HTTPS reverse proxy, set `PUBLIC_ORIGIN` to its public origin to enforce that host and origin and enable HSTS.
 
 The tracker has no login. Anyone who can reach the configured address can view and edit inventory, so keep it on a trusted network or protect it at the reverse proxy.
 
 ### Docker Compose
 
-The Compose configuration at `ops/docker/compose.yaml` persists the SQLite database and its backups in one named volume and binds the service to localhost by default. Set `PUBLIC_ORIGIN` before starting:
+The Compose configuration at `ops/docker/compose.yaml` persists the SQLite database and its backups in one named volume and binds the service to localhost by default. Start it directly for local HTTP access:
+
+```sh
+docker compose -f ops/docker/compose.yaml up -d --build
+```
+
+To place it behind HTTPS, set the proxy origin when starting:
 
 ```sh
 PUBLIC_ORIGIN=https://inventory.example.internal docker compose -f ops/docker/compose.yaml up -d --build

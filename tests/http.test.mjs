@@ -91,6 +91,20 @@ test('security headers, explicit static routes, method restrictions and host/ori
     req.end();
   });
   assert.equal(hostileHostStatus, 403);
+  const lan = await fixture(t, { host: '0.0.0.0' });
+  const lanHostStatus = await new Promise((resolve, reject) => {
+    const req = request(
+      lan.base + '/api/data',
+      { headers: { Host: 'truenas.local:5174' } },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+  assert.equal(lanHostStatus, 200);
 });
 test('rejects malformed, oversized and wrong-content-type bodies without changing data', async (t) => {
   const f = await fixture(t);
@@ -154,11 +168,11 @@ test('storage failures return generic errors without exposing filesystem details
   // Let fixture cleanup safely close an already closed database.
   f.store.close = () => {};
 });
-test('configuration rejects invalid ports and LAN binding without an HTTPS origin', () => {
+test('configuration accepts LAN binding and validates optional HTTPS origins', () => {
   assert.equal(config({}).host, '127.0.0.1');
   for (const PORT of ['0', '-1', 'abc', '1.5', '65536', ''])
     assert.throws(() => config({ PORT }));
-  assert.throws(() => config({ HOST: '0.0.0.0' }));
+  assert.equal(config({ HOST: '0.0.0.0' }).host, '0.0.0.0');
   assert.throws(() =>
     config({
       PUBLIC_ORIGIN: 'http://inventory.local',

@@ -40,11 +40,15 @@ function readBody(request: IncomingMessage): Promise<unknown> {
 export function createApp(options: {
   store: Store;
   root: string;
+  host?: string;
   publicOrigin?: string;
   rateLimit?: number;
   log?: (error: unknown) => void;
 }) {
   const { store, root, publicOrigin } = options;
+  const allowsLanHosts = ['0.0.0.0', '::'].includes(
+    options.host ?? '127.0.0.1',
+  );
   const assets: Record<string, [string, string]> = {
     '/': ['public/index.html', 'text/html; charset=utf-8'],
     '/styles.css': ['public/styles.css', 'text/css; charset=utf-8'],
@@ -119,6 +123,7 @@ export function createApp(options: {
         const host = new URL(`http://${request.headers.host ?? 'invalid'}`)
           .hostname;
         if (
+          !allowsLanHosts &&
           ![
             'localhost',
             '127.0.0.1',

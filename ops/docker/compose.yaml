@@ -12,7 +12,7 @@ services:
       HOST: '0.0.0.0'
       PORT: '5174'
       DATA_DIR: ${CONTAINER_DATA_DIR:-/data}
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the HTTPS address used by your reverse proxy}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     volumes:
       - inventory_data:/data
     read_only: true
