@@ -1,7 +1,7 @@
+# Generated and runtime files
 /node_modules/
 /dist/
 /data/
-/backups/
 /coverage/
 *.log
 *.tsbuildinfo

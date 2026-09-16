@@ -21,7 +21,6 @@
       </div>
     </header>
     <main class="app-content">
-      <p id="status" role="status" aria-live="polite">Loading inventory…</p>
       <div class="controls">
         <button id="retryBtn" type="button" hidden>Retry save</button>
       </div>
@@ -87,24 +86,39 @@
               </form>
             </div>
           </div>
-          <button id="exportBtn" type="button">Export CSV</button>
-          <div class="sort-controls">
-            <label for="qtySort">Sort by quantity</label>
-            <select id="qtySort">
-              <option value="default">Default order</option>
-              <option value="high">High to low</option>
-              <option value="low">Low to high</option>
-            </select>
+          <p id="status" role="status" aria-live="polite">Loading inventory…</p>
+          <div class="transfer-actions">
+            <button id="exportBtn" type="button">Export CSV</button>
+            <button id="importBtn" type="button">Import CSV</button>
+            <input id="importFile" type="file" accept=".csv,text/csv" hidden />
           </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Item description</th>
+                <th id="nameHeader" aria-sort="ascending">
+                  <button
+                    type="button"
+                    class="sort-button"
+                    data-sort="name"
+                    aria-label="Sort by name descending"
+                  >
+                    Name <span aria-hidden="true">↑</span>
+                  </button>
+                </th>
                 <th>Item Type</th>
                 <th>Linked Barcodes</th>
-                <th>Quantity</th>
+                <th id="quantityHeader" aria-sort="none">
+                  <button
+                    type="button"
+                    class="sort-button"
+                    data-sort="qty"
+                    aria-label="Sort by quantity ascending"
+                  >
+                    Quantity <span aria-hidden="true">↕</span>
+                  </button>
+                </th>
                 <th>Action</th>
               </tr>
             </thead>

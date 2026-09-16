@@ -1,4 +1,4 @@
-import type { Controller } from './controller.js';
+import type { Controller } from '../controller.js';
 
 export function mountScanning(doc: Document, controller: Controller) {
   const get = <T extends HTMLElement>(id: string) =>

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { Store } from '../dist/src/storage.js';
+import { Store } from '../dist/server/storage.js';
 
 function fixture(t, legacy) {
   const directory = mkdtempSync(join(tmpdir(), 'inventory-test-'));
@@ -157,6 +157,71 @@ test('type assignment, link/unlink, delete and clear preserve relational integri
   assert.notEqual(state.inventory[0].id, id);
   assert.equal(apply(store, { kind: 'clear' }).inventory.length, 0);
 });
+test('CSV import replaces inventory atomically and consolidates item types', (t) => {
+  const store = fixture(t).open();
+  apply(store, { kind: 'scan', barcode: 'OLD' });
+  const imported = apply(store, {
+    kind: 'import',
+    items: [
+      {
+        barcode: 'A',
+        aliases: ['A2'],
+        description: 'Apple',
+        type: 'Food',
+        qty: 4,
+      },
+      {
+        barcode: 'B',
+        aliases: [],
+        description: 'Bread',
+        type: 'food',
+        qty: 2,
+      },
+    ],
+  });
+  assert.deepEqual(
+    imported.inventory.map(({ barcode, aliases, description, qty }) => ({
+      barcode,
+      aliases,
+      description,
+      qty,
+    })),
+    [
+      { barcode: 'A', aliases: ['A2'], description: 'Apple', qty: 4 },
+      { barcode: 'B', aliases: [], description: 'Bread', qty: 2 },
+    ],
+  );
+  assert.deepEqual(
+    imported.itemTypes.map(({ name }) => name),
+    ['Food'],
+  );
+  assert.ok(
+    imported.inventory.every(
+      (item) => item.typeId === imported.itemTypes[0].id,
+    ),
+  );
+  assert.equal(
+    imported.inventory.some((item) => item.barcode === 'OLD'),
+    false,
+  );
+  assert.throws(
+    () =>
+      apply(store, {
+        kind: 'import',
+        items: [
+          {
+            barcode: 'duplicate',
+            aliases: ['duplicate'],
+            description: '',
+            type: '',
+            qty: 0,
+          },
+        ],
+      }),
+    { status: 400 },
+  );
+  assert.deepEqual(store.read(), imported);
+});
 test('invalid mutations roll back without changing revision or contents', (t) => {
   const store = fixture(t).open();
   const state = apply(store, { kind: 'scan', barcode: 'A' }),
@@ -193,7 +258,7 @@ test('quantity overflow is rejected without losing existing stock', (t) => {
 test('independent processes serialize writes to the same SQLite database', async (t) => {
   const f = fixture(t),
     store = f.open();
-  const moduleUrl = new URL('../dist/src/storage.js', import.meta.url).href;
+  const moduleUrl = new URL('../dist/server/storage.js', import.meta.url).href;
   await Promise.all(
     Array.from(
       { length: 3 },
@@ -224,7 +289,7 @@ test('online backup and restore CLI preserve all state and reject overwrite', as
   await store.backup(backup);
   const restored = join(f.directory, 'restored');
   const run = () =>
-    spawnSync(process.execPath, ['dist/scripts/restore.js', backup, restored], {
+    spawnSync(process.execPath, ['dist/cli/restore.js', backup, restored], {
       encoding: 'utf8',
     });
   assert.equal(run().status, 0);

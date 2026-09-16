@@ -9,8 +9,8 @@ Built with TypeScript, Node.js, and a browser frontend. No separate database ser
 - **Scan in batches:** collect additions or removals in a live list, then apply the batch with Enter or Done.
 - **Linked barcodes:** multiple barcodes can share one item and stock count.
 - **Item management:** edit descriptions and quantities, assign item types, and remove items or barcode links.
-- **Filtering and sorting:** filter by item type or sort by quantity.
-- **CSV export:** download inventory for use in spreadsheets.
+- **Filtering and sorting:** filter by item type or sort by name or quantity from the table headers.
+- **CSV import and export:** download inventory for use in spreadsheets or replace it from an exported CSV.
 - **Reliable saves:** transactional storage, conflict detection, and safe retries protect against lost updates and duplicate scans.
 - **Local or LAN access:** localhost by default, with HTTPS proxy configuration for a private network.
 
@@ -32,14 +32,14 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3001**. Stop the server with `Ctrl+C`.
+Open **http://127.0.0.1:5174**. Stop the server with `Ctrl+C`.
 
 After building, you can also use the platform launcher:
 
-| Platform       | Command         |
-| -------------- | --------------- |
-| Windows        | `.\start.bat`   |
-| Debian / Linux | `sh ./start.sh` |
+| Platform       | Command             |
+| -------------- | ------------------- |
+| Windows        | `.\bin\start.bat`   |
+| Debian / Linux | `sh ./bin/start.sh` |
 
 The launchers resolve their own working directory. They start the compiled application; run `npm run build` again after changing source files.
 
@@ -49,7 +49,7 @@ The launchers resolve their own working directory. They start the compiled appli
 2. Choose **Add** on the left or **Remove** on the right. Scan continuously into the overlay; each scan appears in the list. Press **Enter** or select **Done** to save the entire batch.
 3. Use the pencil button to edit a description; quantities and item types can be changed directly in the table.
 4. Open the item’s barcode dropdown and choose **+ Link barcode**. Scan into the overlay; a scanner’s Enter suffix submits the link automatically. You can also enter a barcode and select **Link barcode**.
-5. Filter or sort the list, or select **Export CSV** to download it.
+5. Filter or sort the list from the Name and Quantity headers. Use **Export CSV** to download it or **Import CSV** to replace the inventory from an exported file.
 
 The batch scanner expects no Enter suffix: a 150 ms input pause separates scans. Leave at least that pause between scans; paste complete barcodes for manual entry. Batches hold up to 250 scans. Each Add scan adds one unit, creating an item for an unknown barcode. Each Remove scan subtracts one unit; zero-stock items remain listed. Unknown barcodes or insufficient stock reject the entire removal batch. Use × to discard an incorrect scan, or Cancel to discard the session. Nothing changes until Done or Enter.
 
@@ -67,10 +67,10 @@ Create a consistent backup, including while the app is running:
 npm run backup
 ```
 
-This creates a timestamped SQLite backup under `backups/`. Restore a backup into a new directory:
+This creates a timestamped SQLite backup under `data/backups/`. Restore a backup into a new directory:
 
 ```sh
-npm run restore -- backups/your-backup.sqlite restored-data
+npm run restore -- data/backups/your-backup.sqlite restored-data
 ```
 
 Stop the app before switching `DATA_DIR` to the restored directory. Do not copy only the main database file while the app is running; committed changes may still be in its SQLite journal. CSV exports are not a complete backup.
@@ -83,13 +83,13 @@ The tracker has no login. Anyone who can reach the configured address can view a
 
 ### Docker Compose
 
-The included `compose.yaml` persists the SQLite database in a named volume and binds the service to localhost by default. Set `PUBLIC_ORIGIN` in an `.env` file before starting:
+The Compose configuration at `ops/docker/compose.yaml` persists the SQLite database and its backups in one named volume and binds the service to localhost by default. Set `PUBLIC_ORIGIN` before starting:
 
 ```sh
-PUBLIC_ORIGIN=https://inventory.example.internal docker compose up -d --build
+PUBLIC_ORIGIN=https://inventory.example.internal docker compose -f ops/docker/compose.yaml up -d --build
 ```
 
-For a Debian host using systemd directly, install Node.js 24.15+ and run `npm ci && npm run build`, then use `sh ./start.sh`. Keep `data/` and `backups/` on persistent storage and schedule `npm run backup`.
+For a Debian host using systemd directly, install Node.js 24.15+ and run `npm ci && npm run build`, then use `sh ./bin/start.sh`. Keep `data/` on persistent storage and schedule `npm run backup`. Example Caddy and systemd files live under `ops/`.
 
 ## Development
 
@@ -109,15 +109,19 @@ For continuous compilation, run `npx tsc --watch` in a second terminal alongside
 ### Project layout
 
 ```text
-client/                  Frontend behavior, save state, and CSV export
-src/                     HTTP handling, configuration, validation, and storage
-scripts/                 Backup and restore commands
-tests/                   API, storage, concurrency, recovery, and DOM tests
-Dockerfile              Production container image
-compose.yaml             Local container deployment
-src/server.ts            Server entry point
-inventory_program.html   Page structure
-styles.css               Page styling
+src/client/               Browser entry point and state controller
+src/client/components/    Interactive UI modules
+src/client/utils/         Browser utilities such as CSV handling
+src/server/               HTTP server, configuration, validation, and storage
+src/cli/                  Backup and restore commands
+public/                   index.html, styles, and images
+tests/                    API, storage, concurrency, recovery, and DOM tests
+bin/                      Windows and Unix launchers
+ops/docker/               Container build configuration
+ops/caddy/                HTTPS reverse-proxy example
+ops/systemd/              Debian service and backup timer examples
+ops/docker/compose.yaml   Local container deployment
+data/                     Runtime database and backups; excluded from Git
 ```
 
 The test suite uses temporary databases and local test servers. It covers migration, concurrent writes, stale edits, retry behavior, validation, request limits, frontend failure states, and backup recovery. Debian deployment and real-device scanning still need validation on the target server and devices.

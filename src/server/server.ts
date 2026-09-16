@@ -1,11 +1,9 @@
-import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { config } from './config.js';
 import { Store } from './storage.js';
 import { createApp } from './http.js';
 
-// This entry point runs only after compilation into dist/.
-const root = fileURLToPath(new URL('../', import.meta.url));
+const root = resolve();
 const settings = config();
 const store = new Store(
   join(settings.dataDir, 'inventory.sqlite'),

@@ -1,10 +1,12 @@
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { Store } from '../src/storage.js';
-const source = resolve(process.env.DATA_DIR ?? 'data', 'inventory.sqlite');
+import { Store } from '../server/storage.js';
+const dataDirectory = resolve(process.env.DATA_DIR ?? 'data');
+const source = join(dataDirectory, 'inventory.sqlite');
 const destination = resolve(
   process.argv[2] ??
     join(
+      dataDirectory,
       'backups',
       `inventory-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite`,
     ),

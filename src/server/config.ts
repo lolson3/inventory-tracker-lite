@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 export function config(env: NodeJS.ProcessEnv = process.env) {
   const host = env.HOST ?? '127.0.0.1';
-  const rawPort = env.PORT ?? '3001';
+  const rawPort = env.PORT ?? '5174';
   if (!/^\d+$/.test(rawPort) || Number(rawPort) < 1 || Number(rawPort) > 65535)
     throw new Error('PORT must be an integer between 1 and 65535');
   const publicOrigin = env.PUBLIC_ORIGIN;

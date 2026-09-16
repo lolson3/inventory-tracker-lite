@@ -19,6 +19,13 @@ export type State = {
   inventory: Item[];
   itemTypes: { id: number; name: string }[];
 };
+export type ImportedItem = {
+  barcode: string;
+  aliases: string[];
+  description: string;
+  type: string;
+  qty: number;
+};
 export function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new HttpError(400, 'Expected an object');
@@ -57,7 +64,8 @@ export type Operation =
     }
   | { kind: 'link' | 'unlink'; id: number; barcode: string }
   | { kind: 'delete'; id: number }
-  | { kind: 'clear' };
+  | { kind: 'clear' }
+  | { kind: 'import'; items: ImportedItem[] };
 export type Command = {
   requestId: string;
   revision: number;
@@ -115,6 +123,45 @@ export function command(value: unknown): Command {
     case 'clear':
       operation = { kind: op.kind };
       break;
+    case 'import': {
+      if (!Array.isArray(op.items) || op.items.length > 100000)
+        throw new HttpError(400, 'Invalid imported inventory');
+      const barcodes = new Set<string>();
+      const items = op.items.map((raw) => {
+        const item = object(raw);
+        if (
+          Object.keys(item).some(
+            (key) =>
+              !['barcode', 'aliases', 'description', 'type', 'qty'].includes(
+                key,
+              ),
+          ) ||
+          !Array.isArray(item.aliases) ||
+          item.aliases.length > 100
+        )
+          throw new HttpError(400, 'Invalid imported item');
+        const imported = {
+          barcode: string(item.barcode, 128),
+          aliases: item.aliases.map((alias) => string(alias, 128)),
+          description: string(item.description, 1000, true, false),
+          type: string(item.type, 100, true),
+          qty: integer(item.qty),
+        };
+        for (const barcode of [imported.barcode, ...imported.aliases]) {
+          if (barcodes.has(barcode))
+            throw new HttpError(400, `Duplicate barcode: ${barcode}`);
+          barcodes.add(barcode);
+        }
+        return imported;
+      });
+      if (
+        new Set(items.map((item) => item.type.toLowerCase()).filter(Boolean))
+          .size > 1000
+      )
+        throw new HttpError(400, 'Too many item types');
+      operation = { kind: op.kind, items };
+      break;
+    }
     case 'edit': {
       const id = integer(op.id, 1);
       if (op.field === 'description')

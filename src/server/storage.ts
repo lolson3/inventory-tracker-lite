@@ -331,6 +331,37 @@ export class Store {
       case 'clear':
         db.prepare('DELETE FROM items').run();
         break;
+      case 'import': {
+        db.prepare('DELETE FROM items').run();
+        db.prepare('DELETE FROM types').run();
+        const types = new Map<string, number>();
+        for (const item of op.items) {
+          const key = item.type.toLowerCase();
+          if (item.type && !types.has(key)) {
+            const id = Number(
+              db
+                .prepare('INSERT INTO types(name,name_key) VALUES (?,?)')
+                .run(item.type, key).lastInsertRowid,
+            );
+            types.set(key, id);
+          }
+          const id = Number(
+            db
+              .prepare(
+                'INSERT INTO items(description,type_id,qty) VALUES (?,?,?)',
+              )
+              .run(item.description, types.get(key) ?? null, item.qty)
+              .lastInsertRowid,
+          );
+          db.prepare('INSERT INTO barcodes VALUES (?,?,1)').run(
+            item.barcode,
+            id,
+          );
+          for (const alias of item.aliases)
+            db.prepare('INSERT INTO barcodes VALUES (?,?,0)').run(alias, id);
+        }
+        break;
+      }
     }
   }
   async backup(path: string) {

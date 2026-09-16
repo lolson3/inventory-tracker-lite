@@ -6,9 +6,9 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { request } from 'node:http';
-import { Store } from '../dist/src/storage.js';
-import { createApp } from '../dist/src/http.js';
-import { config } from '../dist/src/config.js';
+import { Store } from '../dist/server/storage.js';
+import { createApp } from '../dist/server/http.js';
+import { config } from '../dist/server/config.js';
 async function fixture(t, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'inventory-http-'));
   const store = new Store(join(directory, 'db.sqlite'));
@@ -56,9 +56,9 @@ test('security headers, explicit static routes, method restrictions and host/ori
     '/styles.css',
     '/app.js',
     '/controller.js',
-    '/csv.js',
-    '/dropdown.js',
-    '/scanning.js',
+    '/utils/csv.js',
+    '/components/dropdown.js',
+    '/components/scanning.js',
   ])
     assert.equal((await fetch(f.base + path)).status, 200);
   for (const path of [
@@ -168,7 +168,7 @@ test('configuration rejects invalid ports and LAN binding without an HTTPS origi
       HOST: '0.0.0.0',
       PUBLIC_ORIGIN: 'https://inventory.local',
     }).port,
-    3001,
+    5174,
   );
 });
 

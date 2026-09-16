@@ -9,10 +9,10 @@ Group=inventory
 WorkingDirectory=/opt/inventory-tracker-lite
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
-Environment=PORT=3001
+Environment=PORT=5174
 Environment=DATA_DIR=/var/lib/inventory-tracker
 EnvironmentFile=/etc/inventory-tracker.env
-ExecStart=/usr/bin/node /opt/inventory-tracker-lite/dist/server.js
+ExecStart=/usr/bin/node /opt/inventory-tracker-lite/dist/server/server.js
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=20

@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { Controller } from '../dist/client/controller.js';
 import { mount } from '../dist/client/app.js';
-import { csvCell, exportCsv } from '../dist/client/csv.js';
+import { csvCell, exportCsv, importCsv } from '../dist/client/utils/csv.js';
+const html = readFileSync('public/index.html', 'utf8');
 const empty = () => ({ revision: 0, inventory: [], itemTypes: [] });
 const response = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -89,7 +90,7 @@ test('conflict requires reload and does not retry a stale overwrite', async () =
   assert.match(controller.message, /refresh the page/);
 });
 test('DOM starts disabled, load failure retains disabled state, retry recovers', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -107,7 +108,7 @@ test('DOM starts disabled, load failure retains disabled state, retry recovers',
   assert.equal(doc.getElementById('editor').disabled, false);
 });
 test('DOM uses stable type IDs, renders hostile text safely, and filters a type named all', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -152,7 +153,7 @@ test('DOM uses stable type IDs, renders hostile text safely, and filters a type 
   );
 });
 test('DOM keeps failed edit visible and warns before leaving with pending save', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -195,10 +196,206 @@ test('CSV quotes commas and quotes and neutralizes spreadsheet formulas', () => 
     assert.ok(csvCell(text).startsWith('"\''));
   assert.equal(csvCell('00123'), '"00123"');
   assert.match(exportCsv(empty()), /^Primary Barcode,/);
+  const state = {
+    revision: 1,
+    itemTypes: [{ id: 2, name: 'Tools' }],
+    inventory: [
+      {
+        id: 4,
+        barcode: '00123',
+        aliases: ['ALT'],
+        description: '=Cable, "blue"',
+        typeId: 2,
+        qty: 7,
+      },
+    ],
+  };
+  assert.deepEqual(importCsv(exportCsv(state)), [
+    {
+      barcode: '00123',
+      aliases: ['ALT'],
+      description: '=Cable, "blue"',
+      type: 'Tools',
+      qty: 7,
+    },
+  ]);
+  assert.throws(
+    () =>
+      importCsv(
+        'Primary Barcode,Linked Barcodes,Description,Item Type,Qty\nA,A,,,1',
+      ),
+    /appears more than once/,
+  );
+});
+
+test('name and quantity headers sort both directions and Delete is red', async (t) => {
+  const dom = new JSDOM(html, {
+    url: 'http://localhost',
+  });
+  t.after(() => dom.window.close());
+  const doc = dom.window.document;
+  mount(doc, async () =>
+    response({
+      revision: 1,
+      itemTypes: [],
+      inventory: [
+        {
+          id: 1,
+          barcode: 'Z',
+          aliases: [],
+          description: 'Zebra',
+          typeId: null,
+          qty: 2,
+        },
+        {
+          id: 2,
+          barcode: 'A',
+          aliases: [],
+          description: 'Apple',
+          typeId: null,
+          qty: 5,
+        },
+      ],
+    }),
+  );
+  await tick();
+  const descriptions = () =>
+    [...doc.querySelectorAll('.description-text')].map(
+      (element) => element.textContent,
+    );
+  assert.deepEqual(descriptions(), ['Apple', 'Zebra']);
+  doc.querySelector('[data-sort="name"]').click();
+  assert.deepEqual(descriptions(), ['Zebra', 'Apple']);
+  assert.equal(
+    doc.getElementById('nameHeader').getAttribute('aria-sort'),
+    'descending',
+  );
+  doc.querySelector('[data-sort="qty"]').click();
+  assert.deepEqual(descriptions(), ['Zebra', 'Apple']);
+  doc.querySelector('[data-sort="qty"]').click();
+  assert.deepEqual(descriptions(), ['Apple', 'Zebra']);
+  assert.equal(
+    doc.getElementById('quantityHeader').getAttribute('aria-sort'),
+    'descending',
+  );
+  assert.equal(doc.querySelectorAll('[data-action="delete"].danger').length, 2);
+  assert.equal(doc.getElementById('qtySort'), null);
+});
+
+test('quantity clicks debounce into one save without rebuilding the row', async (t) => {
+  const dom = new JSDOM(html, {
+    url: 'http://localhost',
+  });
+  t.after(() => dom.window.close());
+  const doc = dom.window.document;
+  const item = {
+    id: 1,
+    barcode: 'A',
+    aliases: [],
+    description: 'Apple',
+    typeId: null,
+    qty: 1,
+  };
+  const commands = [];
+  let finishSave;
+  mount(doc, async (path, options) => {
+    if (path === '/api/data')
+      return response({ revision: 1, itemTypes: [], inventory: [item] });
+    const command = JSON.parse(options.body);
+    commands.push(command);
+    await new Promise((resolve) => {
+      finishSave = resolve;
+    });
+    return response({
+      revision: 2,
+      itemTypes: [],
+      inventory: [{ ...item, qty: command.operation.value }],
+    });
+  });
+  await tick();
+  const row = doc.querySelector('#inventoryRows tr');
+  const input = doc.querySelector('[data-field="qty"]');
+  input.value = '2';
+  input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  input.value = '3';
+  input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  assert.equal(commands.length, 0);
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  await tick();
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].operation.value, 3);
+  assert.equal(doc.getElementById('editor').disabled, false);
+  assert.equal(doc.getElementById('editor').getAttribute('aria-busy'), 'true');
+  assert.equal(doc.getElementById('retryBtn').hidden, true);
+  assert.equal(input.disabled, false);
+  assert.equal(doc.querySelector('[data-field="typeId"]').disabled, false);
+  assert.equal(doc.querySelector('[data-action="delete"]').disabled, false);
+  finishSave();
+  await tick();
+  assert.equal(doc.querySelector('#inventoryRows tr'), row);
+  assert.equal(input.value, '3');
+  assert.equal(doc.getElementById('status').textContent, 'Saved.');
+  assert.ok(doc.getElementById('status').closest('.filters'));
+});
+
+test('Import CSV confirms and sends the parsed inventory', async (t) => {
+  const dom = new JSDOM(html, {
+    url: 'http://localhost',
+  });
+  t.after(() => dom.window.close());
+  const doc = dom.window.document;
+  const commands = [];
+  dom.window.confirm = () => true;
+  mount(doc, async (path, options) => {
+    if (path === '/api/data') return response(empty());
+    commands.push(JSON.parse(options.body));
+    return response({
+      revision: 1,
+      itemTypes: [],
+      inventory: [
+        {
+          id: 1,
+          barcode: 'A',
+          aliases: [],
+          description: 'Apple',
+          typeId: null,
+          qty: 3,
+        },
+      ],
+    });
+  });
+  await tick();
+  const input = doc.getElementById('importFile');
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [
+      {
+        text: async () =>
+          'Primary Barcode,Linked Barcodes,Description,Item Type,Qty\nA,,Apple,,3',
+      },
+    ],
+  });
+  input.dispatchEvent(new dom.window.Event('change'));
+  await tick();
+  await tick();
+  assert.deepEqual(commands[0].operation, {
+    kind: 'import',
+    items: [
+      {
+        barcode: 'A',
+        aliases: [],
+        description: 'Apple',
+        type: '',
+        qty: 3,
+      },
+    ],
+  });
+  assert.equal(doc.querySelector('.description-text').textContent, 'Apple');
+  assert.equal(input.value, '');
 });
 
 test('browser fetch retains the global receiver for load and save; reload button is absent', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -222,7 +419,7 @@ test('browser fetch retains the global receiver for load and save; reload button
 });
 
 test('type dropdown deletes by stable ID, resets selection, and hides loaded status', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -286,7 +483,7 @@ test('type dropdown deletes by stable ID, resets selection, and hides loaded sta
 });
 
 test('add-type overlay focuses input, preserves failed entry, and closes after retry', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -338,7 +535,7 @@ test('add-type overlay focuses input, preserves failed entry, and closes after r
 });
 
 test('barcode dropdown links scanned input to its item and retains failed scans for retry', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -402,7 +599,7 @@ test('barcode dropdown links scanned input to its item and retains failed scans 
 });
 
 test('description stays static until Edit; Escape cancels and Enter saves', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -459,7 +656,7 @@ test('description stays static until Edit; Escape cancels and Enter saves', asyn
 });
 
 test('continuous scanning queues items without saving until Enter finishes the batch', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -504,7 +701,7 @@ test('continuous scanning queues items without saving until Enter finishes the b
 });
 
 test('rejected removal batch remains editable and Done retries corrected scans', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());
@@ -543,7 +740,7 @@ test('rejected removal batch remains editable and Done retries corrected scans',
 });
 
 test('cancelling a scanning session discards its scans without saving', async (t) => {
-  const dom = new JSDOM(readFileSync('inventory_program.html', 'utf8'), {
+  const dom = new JSDOM(html, {
     url: 'http://localhost',
   });
   t.after(() => dom.window.close());

@@ -1,8 +1,8 @@
-import { mountScanning } from './scanning.js';
-import { closeDropdown, mountDropdowns } from './dropdown.js';
+import { mountScanning } from './components/scanning.js';
+import { closeDropdown, mountDropdowns } from './components/dropdown.js';
 import { Controller } from './controller.js';
-import { exportCsv } from './csv.js';
-import type { Operation, State } from '../src/model.js';
+import { exportCsv, importCsv } from './utils/csv.js';
+import type { Operation, State } from '../server/model.js';
 
 export function mount(doc: Document, request: typeof fetch = fetch) {
   const element = <T extends HTMLElement>(id: string) =>
@@ -49,7 +49,8 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
       addTypeButton.setAttribute('aria-expanded', 'false');
     }
   });
-  const sort = element<HTMLSelectElement>('qtySort');
+  let sortKey: 'name' | 'qty' = 'name';
+  let sortDirection: 'ascending' | 'descending' = 'ascending';
   const status = element<HTMLParagraphElement>('status');
   const retry = element<HTMLButtonElement>('retryBtn');
   const escape = (value: string | number) =>
@@ -65,6 +66,8 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
         })[character]!,
     );
   let rendered: State | null = null;
+  let preservedQuantity: { id: number; qty: number } | null = null;
+  let quantityTimer: number | undefined;
   const controller = new Controller(update, request);
   const linkOverlay = element<HTMLDivElement>('linkOverlay');
   const linkInput = element<HTMLInputElement>('linkedBarcode');
@@ -159,12 +162,17 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
     const items = state.inventory.filter(
       (item) => selectedType === 'all' || item.typeId === Number(selectedType),
     );
-    if (sort.value !== 'default')
-      items.sort(
-        (a, b) =>
-          (sort.value === 'high' ? b.qty - a.qty : a.qty - b.qty) ||
-          a.id - b.id,
-      );
+    const direction = sortDirection === 'ascending' ? 1 : -1;
+    items.sort((a, b) => {
+      const comparison =
+        sortKey === 'qty'
+          ? a.qty - b.qty
+          : a.description.localeCompare(b.description, undefined, {
+              numeric: true,
+              sensitivity: 'base',
+            });
+      return comparison * direction || a.id - b.id;
+    });
     rows.innerHTML = items
       .map(
         (item) => `<tr>
@@ -172,7 +180,7 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
       <td><select aria-label="Type for ${escape(item.barcode)}" data-id="${item.id}" data-field="typeId"><option value="">No type</option>${state.itemTypes.map((type) => `<option value="${type.id}" ${type.id === item.typeId ? 'selected' : ''}>${escape(type.name)}</option>`).join('')}</select></td>
       <td><div class="filter-dropdown barcode-dropdown" data-item="${item.id}"><button type="button" class="filter-trigger" aria-expanded="false" aria-controls="barcode-menu-${item.id}" aria-label="Barcodes for ${escape(item.description || item.barcode)}">${escape(item.barcode)}</button><div id="barcode-menu-${item.id}" class="filter-menu" role="group" aria-label="Linked barcodes" hidden>${[item.barcode, ...item.aliases].map((code) => `<div class="barcode-option"><span>${escape(code)}${code === item.barcode ? '<small>Primary</small>' : ''}</span><button type="button" class="delete-type" data-action="unlink" data-id="${item.id}" data-code="${escape(code)}" aria-label="Unlink ${escape(code)}" title="${item.aliases.length === 0 ? 'Keep at least one barcode' : 'Unlink barcode'}" ${item.aliases.length === 0 ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg></button></div>`).join('')}<button type="button" class="barcode-link" data-action="link" data-id="${item.id}">+ Link barcode</button></div></div></td>
       <td><input aria-label="Quantity for ${escape(item.barcode)}" data-id="${item.id}" data-field="qty" type="number" min="0" max="9007199254740991" step="1" value="${item.qty}"></td>
-      <td><button type="button" data-action="delete" data-id="${item.id}">Delete</button></td>
+      <td><button type="button" class="danger" data-action="delete" data-id="${item.id}">Delete</button></td>
     </tr>`,
       )
       .join('');
@@ -191,13 +199,29 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
       : controller.message;
     status.textContent = controller.message;
     status.hidden = !controller.message;
+    const pendingOperation = controller.pending?.operation;
+    const savingQuantity =
+      pendingOperation?.kind === 'edit' && pendingOperation.field === 'qty';
     editor.disabled =
-      !controller.ready || controller.busy || controller.pending !== null;
-    retry.hidden = controller.pending === null;
+      !controller.ready ||
+      (!savingQuantity && (controller.busy || controller.pending !== null));
+    editor.classList.toggle('saving-quantity', savingQuantity);
+    if (savingQuantity) editor.setAttribute('aria-busy', 'true');
+    else editor.removeAttribute('aria-busy');
+    retry.hidden = controller.pending === null || controller.busy;
     retry.disabled = controller.busy;
     if (rendered !== controller.state) {
       rendered = controller.state;
-      draw();
+      const savedQuantity =
+        preservedQuantity &&
+        controller.message === 'Saved.' &&
+        controller.state.inventory.some(
+          (item) =>
+            item.id === preservedQuantity!.id &&
+            item.qty === preservedQuantity!.qty,
+        );
+      if (savedQuantity) preservedQuantity = null;
+      else draw();
     }
   }
   async function retrySave() {
@@ -225,6 +249,19 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
       else if (input.id === 'linkedBarcode') closeLinkOverlay();
       else input.focus();
     }
+  }
+  async function saveQuantity(input: HTMLInputElement) {
+    if (!input.isConnected || controller.busy || controller.pending) return;
+    if (!input.checkValidity()) {
+      input.reportValidity();
+      return;
+    }
+    const id = Number(input.dataset.id);
+    const qty = Number(input.value);
+    if (controller.state.inventory.find((item) => item.id === id)?.qty === qty)
+      return;
+    preservedQuantity = { id, qty };
+    await run({ kind: 'edit', id, field: 'qty', value: qty });
   }
   element<HTMLFormElement>('typeForm').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -269,6 +306,13 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
   });
   rows.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
+    if (input.dataset.field === 'qty') {
+      if (quantityTimer !== undefined)
+        doc.defaultView!.clearTimeout(quantityTimer);
+      quantityTimer = undefined;
+      void saveQuantity(input);
+      return;
+    }
     if (
       input.dataset.field === 'description' &&
       !input.hidden &&
@@ -279,12 +323,22 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
     )
       finishDescription(input);
   });
+  rows.addEventListener('input', (event) => {
+    const input = event.target as HTMLInputElement;
+    if (input.dataset.field !== 'qty') return;
+    if (quantityTimer !== undefined)
+      doc.defaultView!.clearTimeout(quantityTimer);
+    quantityTimer = doc.defaultView!.setTimeout(() => {
+      quantityTimer = undefined;
+      void saveQuantity(input);
+    }, 500);
+  });
   rows.addEventListener('change', (event) => {
     const input = event.target as HTMLInputElement;
     const field = input.dataset.field;
+    if (field === 'qty') return;
     if (field === 'description' && input.hidden) return;
-    if (field !== 'description' && field !== 'qty' && field !== 'typeId')
-      return;
+    if (field !== 'description' && field !== 'typeId') return;
     if (!input.checkValidity()) {
       input.reportValidity();
       return;
@@ -296,7 +350,7 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
       value:
         field === 'description'
           ? input.value
-          : field === 'typeId' && input.value === ''
+          : input.value === ''
             ? null
             : Number(input.value),
     });
@@ -365,7 +419,36 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
     removeOverlay.hidden = false;
     cancelRemove.focus();
   });
-  sort.addEventListener('change', draw);
+  for (const button of doc.querySelectorAll<HTMLButtonElement>('[data-sort]'))
+    button.addEventListener('click', () => {
+      const nextKey = button.dataset.sort as 'name' | 'qty';
+      if (sortKey === nextKey)
+        sortDirection =
+          sortDirection === 'ascending' ? 'descending' : 'ascending';
+      else {
+        sortKey = nextKey;
+        sortDirection = 'ascending';
+      }
+      for (const [key, headerId] of [
+        ['name', 'nameHeader'],
+        ['qty', 'quantityHeader'],
+      ] as const) {
+        const header = element<HTMLTableCellElement>(headerId);
+        const control = header.querySelector<HTMLButtonElement>('button')!;
+        const active = sortKey === key;
+        header.setAttribute('aria-sort', active ? sortDirection : 'none');
+        control.querySelector('span')!.textContent = active
+          ? sortDirection === 'ascending'
+            ? '↑'
+            : '↓'
+          : '↕';
+        control.setAttribute(
+          'aria-label',
+          `Sort by ${key === 'name' ? 'name' : 'quantity'} ${active && sortDirection === 'ascending' ? 'descending' : 'ascending'}`,
+        );
+      }
+      draw();
+    });
   element('exportBtn').addEventListener('click', () => {
     const link = doc.createElement('a');
     const url = URL.createObjectURL(
@@ -378,11 +461,39 @@ export function mount(doc: Document, request: typeof fetch = fetch) {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  const importFile = element<HTMLInputElement>('importFile');
+  element('importBtn').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', () => {
+    const file = importFile.files?.[0];
+    if (!file) return;
+    void (async () => {
+      try {
+        const items = importCsv(await file.text());
+        if (
+          !doc.defaultView!.confirm(
+            `Replace the current inventory with ${items.length} item${items.length === 1 ? '' : 's'} from this CSV?`,
+          )
+        )
+          return;
+        await run({ kind: 'import', items });
+      } catch (error) {
+        controller.message = `Import failed: ${(error as Error).message}`;
+        update();
+      } finally {
+        importFile.value = '';
+      }
+    })();
+  });
   retry.addEventListener('click', () => {
     void retrySave();
   });
   doc.defaultView!.addEventListener('beforeunload', (event) => {
-    if (controller.busy || controller.pending || scanning?.hasDraft()) {
+    if (
+      controller.busy ||
+      controller.pending ||
+      quantityTimer !== undefined ||
+      scanning?.hasDraft()
+    ) {
       event.preventDefault();
       event.returnValue = '';
     }

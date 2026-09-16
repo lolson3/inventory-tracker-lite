@@ -3,15 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/src/server.js",
-    "dev": "npm run build && node --watch dist/src/server.js",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
+    "start": "node dist/server/server.js",
+    "dev": "npm run build && node --watch dist/server/server.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "backup": "node dist/scripts/backup.js",
-    "restore": "node dist/scripts/restore.js"
+    "backup": "node dist/cli/backup.js",
+    "restore": "node dist/cli/restore.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

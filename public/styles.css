@@ -181,10 +181,11 @@ td.actions {
   text-align: center;
   color: #6d7887;
 }
-.status {
-  min-height: 1.25em;
-  margin: 12px 0 0;
+#status {
+  margin: 0;
   color: #1769e0;
+  font-size: 0.9rem;
+  line-height: 1.25;
 }
 
 fieldset {
@@ -192,6 +193,9 @@ fieldset {
   margin: 0;
   padding: 0;
   min-width: 0;
+}
+fieldset.saving-quantity {
+  pointer-events: none;
 }
 legend {
   font-weight: bold;
@@ -270,11 +274,28 @@ button:disabled {
   height: 18px;
 }
 
-.sort-controls {
+.transfer-actions {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-left: auto;
+}
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: -8px -10px;
+  padding: 8px 10px;
+  color: #172033;
+  font-weight: 650;
+  background: transparent;
+}
+.sort-button:hover {
+  background: #e2e7ee;
+}
+.sort-button span {
+  color: #1769e0;
+  font-size: 1rem;
 }
 .type-creator {
   position: relative;
@@ -312,7 +333,7 @@ button:disabled {
   gap: 8px;
 }
 @media (max-width: 640px) {
-  .sort-controls {
+  .transfer-actions {
     width: 100%;
     justify-content: flex-end;
   }

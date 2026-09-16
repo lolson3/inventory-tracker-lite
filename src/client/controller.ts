@@ -1,4 +1,4 @@
-import type { Command, Operation, State } from '../src/model.js';
+import type { Command, Operation, State } from '../server/model.js';
 export class Controller {
   state: State = { revision: 0, inventory: [], itemTypes: [] };
   ready = false;

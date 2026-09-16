@@ -46,29 +46,32 @@ export function createApp(options: {
 }) {
   const { store, root, publicOrigin } = options;
   const assets: Record<string, [string, string]> = {
-    '/': ['inventory_program.html', 'text/html; charset=utf-8'],
-    '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+    '/': ['public/index.html', 'text/html; charset=utf-8'],
+    '/styles.css': ['public/styles.css', 'text/css; charset=utf-8'],
     '/app.js': ['dist/client/app.js', 'text/javascript; charset=utf-8'],
-    '/scanning.js': [
-      'dist/client/scanning.js',
+    '/components/scanning.js': [
+      'dist/client/components/scanning.js',
       'text/javascript; charset=utf-8',
     ],
-    '/dropdown.js': [
-      'dist/client/dropdown.js',
+    '/components/dropdown.js': [
+      'dist/client/components/dropdown.js',
       'text/javascript; charset=utf-8',
     ],
     '/controller.js': [
       'dist/client/controller.js',
       'text/javascript; charset=utf-8',
     ],
-    '/csv.js': ['dist/client/csv.js', 'text/javascript; charset=utf-8'],
+    '/utils/csv.js': [
+      'dist/client/utils/csv.js',
+      'text/javascript; charset=utf-8',
+    ],
 
     '/img/inventory-favicon-16x16.png': [
-      'img/inventory-favicon-16x16.png',
+      'public/img/inventory-favicon-16x16.png',
       'image/png',
     ],
 
-    '/img/inventory.png': ['img/inventory.png', 'image/png'],
+    '/img/inventory.png': ['public/img/inventory.png', 'image/png'],
   };
   let windowStart = Date.now(),
     requests = 0;

@@ -1,19 +1,13 @@
 # Only build inputs enter the context. Never ship live inventory or secrets.
 **
-!Dockerfile
-!.dockerignore
+!ops/docker/Dockerfile
+!ops/docker/Dockerfile.dockerignore
 !package.json
 !package-lock.json
 !tsconfig.json
-!inventory_program.html
-!styles.css
 !src/
 !src/**
-!client/
-!client/**
-!scripts/
-!scripts/**
 !tests/
 !tests/**
-!img/
-!img/*.png
+!public/
+!public/**
