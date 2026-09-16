@@ -1,0 +1,30 @@
+services:
+  inventory:
+    image: ${INVENTORY_IMAGE:-inventory-tracker-lite:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${HOST_PORT:-3001}:3001'
+    environment:
+      HOST: '0.0.0.0'
+      PORT: '3001'
+      DATA_DIR: ${CONTAINER_DATA_DIR:-/data}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the HTTPS address used by your reverse proxy}
+    volumes:
+      - inventory_data:/data
+      - inventory_backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+
+volumes:
+  inventory_data:
+  inventory_backups:
