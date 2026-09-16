@@ -57,6 +57,7 @@ test('security headers, explicit static routes, method restrictions and host/ori
     '/app.js',
     '/controller.js',
     '/utils/csv.js',
+    '/utils/uuid.js',
     '/components/dropdown.js',
     '/components/scanning.js',
     '/components/theme.js',

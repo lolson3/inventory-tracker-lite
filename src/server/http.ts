@@ -73,6 +73,10 @@ export function createApp(options: {
       'dist/client/utils/csv.js',
       'text/javascript; charset=utf-8',
     ],
+    '/utils/uuid.js': [
+      'dist/client/utils/uuid.js',
+      'text/javascript; charset=utf-8',
+    ],
 
     '/img/inventory-favicon-16x16.png': [
       'public/img/inventory-favicon-16x16.png',

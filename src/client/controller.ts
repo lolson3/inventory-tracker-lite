@@ -1,4 +1,5 @@
 import type { Command, Operation, State } from '../server/model.js';
+import { randomUuid } from './utils/uuid.js';
 export class Controller {
   state: State = { revision: 0, inventory: [], itemTypes: [] };
   ready = false;
@@ -8,7 +9,7 @@ export class Controller {
   constructor(
     private changed: () => void,
     private request: typeof fetch = fetch,
-    private uuid = () => crypto.randomUUID(),
+    private uuid = randomUuid,
   ) {}
   private async api(path: string, command?: Command): Promise<State> {
     const response = await this.request.call(globalThis, path, {

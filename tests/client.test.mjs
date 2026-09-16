@@ -6,6 +6,7 @@ import { Controller } from '../dist/client/controller.js';
 import { mount } from '../dist/client/app.js';
 import { mountThemeToggle } from '../dist/client/components/theme.js';
 import { csvCell, exportCsv, importCsv } from '../dist/client/utils/csv.js';
+import { randomUuid } from '../dist/client/utils/uuid.js';
 const html = readFileSync('public/index.html', 'utf8');
 const empty = () => ({ revision: 0, inventory: [], itemTypes: [] });
 const response = (body, status = 200) =>
@@ -14,6 +15,17 @@ const response = (body, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('UUID generation works when randomUUID is unavailable over HTTP', () => {
+  const value = randomUuid({
+    getRandomValues(array) {
+      array.set(Array.from({ length: 16 }, (_, index) => index));
+      return array;
+    },
+  });
+
+  assert.equal(value, '00010203-0405-4607-8809-0a0b0c0d0e0f');
+});
 
 test('theme button toggles and persists dark mode', (t) => {
   const dom = new JSDOM(html, { url: 'http://localhost' });
