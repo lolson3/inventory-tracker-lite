@@ -12,5 +12,10 @@
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/server.ts", "src/**/*.ts", "client/**/*.ts", "scripts/**/*.ts"]
+  "include": [
+    "src/server.ts",
+    "src/**/*.ts",
+    "client/**/*.ts",
+    "scripts/**/*.ts"
+  ]
 }

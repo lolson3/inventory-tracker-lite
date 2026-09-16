@@ -5,7 +5,6 @@
 !package.json
 !package-lock.json
 !tsconfig.json
-!server.ts
 !inventory_program.html
 !styles.css
 !src/

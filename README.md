@@ -75,20 +75,21 @@ npm run restore -- backups/your-backup.sqlite restored-data
 
 Stop the app before switching `DATA_DIR` to the restored directory. Do not copy only the main database file while the app is running; committed changes may still be in its SQLite journal. CSV exports are not a complete backup.
 
-For scheduled backups, custom paths, and recovery procedures, see the [deployment guide](docs/DEPLOYMENT.md#backups-and-restore).
-
 ## Hosting on Debian
 
-The default listen address is `127.0.0.1`, so the app is accessible only from the server itself. For LAN access, use an HTTPS reverse proxy.
+The default listen address is `127.0.0.1`, so the app is accessible only from the server itself. For LAN access, put it behind an HTTPS reverse proxy and set `HOST=0.0.0.0` together with a matching `PUBLIC_ORIGIN`.
 
-The [deployment guide](docs/DEPLOYMENT.md) covers:
+The tracker has no login. Anyone who can reach the configured address can view and edit inventory, so keep it on a trusted network or protect it at the reverse proxy.
 
-- Environment variables and data-directory configuration
-- A dedicated service account and systemd service
-- HTTPS access through Caddy
-- Daily backups and restore procedures
+### Docker Compose
 
-Example configuration files are in [`deploy/`](deploy/). The tracker opens without a login. Anyone who can reach it can view and edit inventory.
+The included `compose.yaml` persists the SQLite database in a named volume and binds the service to localhost by default. Set `PUBLIC_ORIGIN` in an `.env` file before starting:
+
+```sh
+PUBLIC_ORIGIN=https://inventory.example.internal docker compose up -d --build
+```
+
+For a Debian host using systemd directly, install Node.js 24.15+ and run `npm ci && npm run build`, then use `sh ./start.sh`. Keep `data/` and `backups/` on persistent storage and schedule `npm run backup`.
 
 ## Development
 
@@ -112,16 +113,14 @@ client/                  Frontend behavior, save state, and CSV export
 src/                     HTTP handling, configuration, validation, and storage
 scripts/                 Backup and restore commands
 tests/                   API, storage, concurrency, recovery, and DOM tests
-deploy/                  Debian service and HTTPS proxy examples
-docs/                    Deployment and recovery guide
-server.ts                Server entry point
+Dockerfile              Production container image
+compose.yaml             Local container deployment
+src/server.ts            Server entry point
 inventory_program.html   Page structure
 styles.css               Page styling
 ```
 
-Tests use temporary databases and local test servers. They cover migration, concurrent writes, stale edits, retry behavior, validation, access controls, request limits, frontend failure states, and backup recovery. GitHub Actions is configured to run checks on Windows and Linux.
-
-See [AUDIT.md](AUDIT.md) for the latest local verification results and remaining limitations. Debian deployment and real-device scanning still need validation on the target server and devices.
+The test suite uses temporary databases and local test servers. It covers migration, concurrent writes, stale edits, retry behavior, validation, request limits, frontend failure states, and backup recovery. Debian deployment and real-device scanning still need validation on the target server and devices.
 
 ## License
 
