@@ -1,0 +1,17 @@
+[Unit]
+Description=Back up Inventory Tracker Lite
+
+[Service]
+Type=oneshot
+User=inventory
+Group=inventory
+WorkingDirectory=/var/lib/inventory-backups
+Environment=DATA_DIR=/var/lib/inventory-tracker
+ExecStart=/usr/bin/node /opt/inventory-tracker-lite/dist/scripts/backup.js
+UMask=0077
+StateDirectory=inventory-tracker inventory-backups
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

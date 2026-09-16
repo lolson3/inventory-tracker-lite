@@ -1,0 +1,5 @@
+# Replace this hostname and trust your internal CA on client devices.
+inventory.example.internal {
+    tls internal
+    reverse_proxy 127.0.0.1:3001
+}

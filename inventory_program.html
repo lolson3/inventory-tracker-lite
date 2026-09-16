@@ -1,182 +1,204 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Barcode Inventory</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <h1>Barcode Inventory</h1>
-  <p class="note">Scan a barcode to add one quantity. Linked barcodes share one quantity. You can assign an item type, filter the list by type, and sort displayed items by quantity.</p>
-
-  <form id="scanForm" class="scanner">
-    <input id="barcode" type="text" autocomplete="off" inputmode="numeric" placeholder="Scan or enter barcode" autofocus required>
-    <button type="submit">Add / Scan</button>
-  </form>
-  <p id="status" class="status" aria-live="polite"></p>
-
-  <h2>Item types</h2>
-  <form id="typeForm" class="type-manager">
-    <input id="newType" type="text" placeholder="New type, e.g. Clothing or Electronics" required>
-    <button type="submit">Add item type</button>
-  </form>
-
-  <h2>Link another barcode to an item</h2>
-  <form id="linkForm" class="linker">
-    <select id="entrySelect" required></select>
-    <input id="linkedBarcode" type="text" autocomplete="off" inputmode="numeric" placeholder="Scan or enter additional barcode" required>
-    <button type="submit">Link barcode</button>
-  </form>
-
-  <div class="filters">
-    <label for="typeFilterButton">Filter by type:</label>
-    <div id="typeFilter" class="filter-dropdown">
-      <button id="typeFilterButton" type="button" class="filter-trigger" aria-haspopup="listbox" aria-expanded="false"></button>
-      <div id="typeFilterMenu" class="filter-menu" role="listbox" hidden></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inventory Tracker Lite</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-content">
+        <div class="app-mark" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="m12 3 9 5-9 5-9-5 9-5Z M3 8v9l9 5 9-5V8 M12 13v9 M7.5 5.5l9 5"
+            />
+          </svg>
+        </div>
+        <div class="app-heading">
+          <h1>Inventory Tracker <span>Lite</span></h1>
+          <p>Scan items in and out. Keep your inventory in sync.</p>
+        </div>
+      </div>
+    </header>
+    <main class="app-content">
+      <p id="status" role="status" aria-live="polite">Loading inventory…</p>
+      <div class="controls">
+        <button id="retryBtn" type="button" hidden>Retry save</button>
+      </div>
+      <fieldset id="editor" aria-label="Inventory controls" disabled>
+        <div class="scan-actions">
+          <button id="addInventory" type="button">Add</button>
+          <button id="removeInventory" type="button" class="danger">
+            Remove
+          </button>
+        </div>
+        <div class="filters">
+          <label for="typeFilterButton">Filter by type</label>
+          <div id="typeFilter" class="filter-dropdown">
+            <button
+              id="typeFilterButton"
+              type="button"
+              class="filter-trigger"
+              aria-expanded="false"
+              aria-controls="typeFilterMenu"
+            >
+              All item types
+            </button>
+            <div
+              id="typeFilterMenu"
+              class="filter-menu"
+              role="group"
+              aria-label="Filter and manage item types"
+              hidden
+            ></div>
+          </div>
+          <div id="typeCreator" class="type-creator">
+            <button
+              id="addTypeButton"
+              type="button"
+              class="add-type"
+              aria-label="Add item type"
+              aria-expanded="false"
+              aria-controls="typeOverlay"
+            >
+              +
+            </button>
+            <div
+              id="typeOverlay"
+              class="type-overlay"
+              role="dialog"
+              aria-labelledby="typeOverlayTitle"
+              hidden
+            >
+              <form id="typeForm">
+                <label id="typeOverlayTitle" for="newType">Add item type</label>
+                <input
+                  id="newType"
+                  maxlength="100"
+                  autocomplete="off"
+                  required
+                />
+                <div class="overlay-actions">
+                  <button id="cancelTypeButton" type="button" class="secondary">
+                    Cancel
+                  </button>
+                  <button type="submit">Add type</button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <button id="exportBtn" type="button">Export CSV</button>
+          <div class="sort-controls">
+            <label for="qtySort">Sort by quantity</label>
+            <select id="qtySort">
+              <option value="default">Default order</option>
+              <option value="high">High to low</option>
+              <option value="low">Low to high</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item description</th>
+                <th>Item Type</th>
+                <th>Linked Barcodes</th>
+                <th>Quantity</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryRows"></tbody>
+          </table>
+          <p id="empty" class="empty">No matching inventory items.</p>
+        </div>
+      </fieldset>
+    </main>
+    <div id="scanOverlay" class="confirmation-backdrop" hidden>
+      <section
+        class="confirmation-card scan-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scanTitle"
+      >
+        <h2 id="scanTitle">Add inventory</h2>
+        <form id="batchForm">
+          <label for="batchBarcode">Scan a barcode</label>
+          <input id="batchBarcode" autocomplete="off" />
+          <p class="note">
+            Keep scanning. Press Enter or select Done to save this batch.
+          </p>
+          <p id="batchCount" role="status"></p>
+          <ol id="batchScans" aria-label="Scanned items"></ol>
+          <p id="batchStatus" role="status"></p>
+          <div class="overlay-actions">
+            <button id="cancelBatch" type="button" class="secondary">
+              Cancel
+            </button>
+            <button id="retryBatch" type="button" hidden>Retry save</button>
+            <button id="finishBatch" type="submit">Done</button>
+          </div>
+        </form>
+      </section>
     </div>
-    <label for="qtySort">Sort by quantity:</label>
-    <select id="qtySort">
-      <option value="default">Default order</option>
-      <option value="high">High to low</option>
-      <option value="low">Low to high</option>
-    </select>
-  </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Primary barcode</th><th>Linked barcodes</th><th>Item description</th><th>Item type</th><th>Qty</th><th>Action</th></tr></thead>
-      <tbody id="inventoryRows"></tbody>
-    </table>
-    <div id="empty" class="empty">No matching inventory items. Scan a barcode to begin or change the filter.</div>
-  </div>
-
-  <div class="controls">
-    <button id="exportBtn" type="button" class="secondary">Export CSV</button>
-    <button id="clearBtn" type="button" class="secondary">Clear inventory</button>
-  </div>
-
-  <script>
-    function normalize(data) {
-      return (Array.isArray(data) ? data : []).map(item => ({
-        barcode: String(item.barcode || '').trim(), aliases: Array.isArray(item.aliases) ? item.aliases.map(String).filter(Boolean) : [],
-        description: String(item.description || ''), type: String(item.type || ''), qty: Math.max(0, Number.parseInt(item.qty, 10) || 0)
-      })).filter(item => item.barcode);
-    }
-    let inventory = [];
-    let itemTypes = [];
-    const rows = document.getElementById('inventoryRows'), barcodeInput = document.getElementById('barcode'), status = document.getElementById('status');
-    const entrySelect = document.getElementById('entrySelect'), typeFilter = document.getElementById('typeFilter'), typeFilterButton = document.getElementById('typeFilterButton'), typeFilterMenu = document.getElementById('typeFilterMenu'), qtySort = document.getElementById('qtySort');
-    let selectedTypeFilter = 'all';
-    let saveQueue = Promise.resolve();
-    function save() {
-      const snapshot = JSON.stringify({inventory, itemTypes});
-      saveQueue = saveQueue.then(async () => {
-        const response = await fetch('/api/data', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: snapshot});
-        if (!response.ok) throw new Error('Could not save inventory');
-      }).catch(error => { status.textContent = error.message; });
-    }
-    function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-    function findEntry(barcode) { return inventory.find(item => item.barcode === barcode || item.aliases.includes(barcode)); }
-    function label(item) { return `${item.barcode} — ${item.description.trim() || 'No description'} (Qty: ${item.qty})`; }
-    function typeOptions(selected = '', includeBlank = true) { return `${includeBlank ? '<option value="">No type</option>' : ''}${itemTypes.map(type => `<option value="${escapeHtml(type)}" ${type === selected ? 'selected' : ''}>${escapeHtml(type)}</option>`).join('')}`; }
-    function render() {
-      if (selectedTypeFilter !== 'all' && selectedTypeFilter !== '' && !itemTypes.includes(selectedTypeFilter)) selectedTypeFilter = 'all';
-      typeFilterButton.textContent = selectedTypeFilter === 'all' ? 'All item types' : selectedTypeFilter;
-      const filterOption = (value, label) => `<button type="button" class="filter-choice" role="option" aria-selected="${selectedTypeFilter === value}" data-filter-type="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
-      typeFilterMenu.innerHTML = filterOption('all', 'All item types') + itemTypes.map((type, index) => `<div class="filter-option">${filterOption(type, type)}<button type="button" class="delete-type" data-delete-type="${index}" aria-label="Remove ${escapeHtml(type)}" title="Remove type"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg></button></div>`).join('');
-      let display = inventory.map((item, index) => ({item, index}));
-      if (selectedTypeFilter !== 'all') display = display.filter(x => x.item.type === selectedTypeFilter);
-      if (qtySort.value === 'high') display.sort((a,b) => b.item.qty - a.item.qty || a.index - b.index);
-      if (qtySort.value === 'low') display.sort((a,b) => a.item.qty - b.item.qty || a.index - b.index);
-      rows.innerHTML = display.map(({item, index}) => `
-        <tr>
-          <td>${escapeHtml(item.barcode)}</td>
-          <td class="aliases">${item.aliases.length ? item.aliases.map(alias => `<div>${escapeHtml(alias)} <button type="button" class="unlink" data-unlink-entry="${index}" data-unlink-barcode="${escapeHtml(alias)}">Unlink</button></div>`).join('') : '—'}</td>
-          <td><input data-index="${index}" data-field="description" value="${escapeHtml(item.description)}" placeholder="Enter item description"></td>
-          <td class="type"><select data-index="${index}" data-field="type">${typeOptions(item.type)}</select></td>
-          <td class="qty"><input data-index="${index}" data-field="qty" type="number" min="0" step="1" value="${item.qty}"></td>
-          <td class="actions"><button type="button" class="secondary" data-delete="${index}">Delete</button></td>
-        </tr>`).join('');
-      entrySelect.innerHTML = inventory.length ? inventory.map((item, index) => `<option value="${index}">${escapeHtml(label(item))}</option>`).join('') : '<option value="">Add an item first</option>';
-      entrySelect.disabled = inventory.length === 0; document.querySelector('#linkForm button').disabled = inventory.length === 0;
-      document.getElementById('empty').hidden = display.length > 0;
-    }
-    function addBarcode(rawBarcode) {
-      const barcode = rawBarcode.trim(); if (!barcode) return;
-      const existing = findEntry(barcode);
-      if (existing) { existing.qty += 1; status.textContent = `Added 1 to ${existing.barcode}. Shared quantity is now ${existing.qty}.`; }
-      else { inventory.push({barcode, aliases: [], description: '', type: '', qty: 1}); status.textContent = `Added new barcode ${barcode} with a quantity of 1.`; }
-      save(); render(); barcodeInput.value = ''; barcodeInput.focus();
-    }
-    document.getElementById('scanForm').addEventListener('submit', e => { e.preventDefault(); addBarcode(barcodeInput.value); });
-    document.getElementById('typeForm').addEventListener('submit', e => {
-      e.preventDefault(); const type = document.getElementById('newType').value.trim();
-      if (!type) return;
-      if (itemTypes.some(x => x.toLowerCase() === type.toLowerCase())) status.textContent = `Item type “${type}” already exists.`;
-      else { itemTypes.push(type); itemTypes.sort((a,b) => a.localeCompare(b)); save(); render(); status.textContent = `Added item type “${type}”.`; }
-      document.getElementById('newType').value = '';
-    });
-    typeFilterButton.addEventListener('click', () => {
-      const isOpen = !typeFilterMenu.hidden; typeFilterMenu.hidden = isOpen; typeFilterButton.setAttribute('aria-expanded', String(!isOpen));
-    });
-    typeFilterMenu.addEventListener('click', e => {
-      const choice = e.target.closest('[data-filter-type]');
-      if (choice) { selectedTypeFilter = choice.dataset.filterType; typeFilterMenu.hidden = true; typeFilterButton.setAttribute('aria-expanded', 'false'); render(); return; }
-      const button = e.target.closest('[data-delete-type]'); if (!button) return;
-      const index = Number(button.dataset.deleteType), type = itemTypes[index]; if (type === undefined) return;
-      const assignedCount = inventory.filter(item => item.type === type).length;
-      const warning = assignedCount ? `Remove “${type}”? ${assignedCount} item${assignedCount === 1 ? '' : 's'} will be changed to No type.` : `Remove “${type}”?`;
-      if (!confirm(warning)) return;
-      inventory.forEach(item => { if (item.type === type) item.type = ''; });
-      itemTypes.splice(index, 1); save(); render(); status.textContent = `Removed item type “${type}”.`;
-    });
-    document.addEventListener('click', e => {
-      if (!typeFilter.contains(e.target)) { typeFilterMenu.hidden = true; typeFilterButton.setAttribute('aria-expanded', 'false'); }
-    });
-    document.getElementById('linkForm').addEventListener('submit', e => {
-      e.preventDefault(); const index = Number(entrySelect.value), barcode = document.getElementById('linkedBarcode').value.trim();
-      if (!barcode || !inventory[index]) return;
-      const existing = findEntry(barcode);
-      if (existing) status.textContent = `Barcode ${barcode} is already linked to primary barcode ${existing.barcode}.`;
-      else { inventory[index].aliases.push(barcode); save(); render(); status.textContent = `Linked ${barcode} to ${inventory[index].barcode}.`; }
-      document.getElementById('linkedBarcode').value = '';
-    });
-    rows.addEventListener('change', e => {
-      const input = e.target, index = Number(input.dataset.index); if (!Number.isInteger(index) || !inventory[index]) return;
-      if (input.dataset.field === 'qty') inventory[index].qty = Math.max(0, Number.parseInt(input.value, 10) || 0);
-      if (input.dataset.field === 'description') inventory[index].description = input.value;
-      if (input.dataset.field === 'type') inventory[index].type = input.value;
-      save(); render();
-    });
-    rows.addEventListener('click', e => {
-      const button = e.target;
-      if (button.dataset.unlinkEntry !== undefined) {
-        const index = Number(button.dataset.unlinkEntry), barcode = button.dataset.unlinkBarcode; if (!inventory[index]) return;
-        inventory[index].aliases = inventory[index].aliases.filter(alias => alias !== barcode); save(); render(); status.textContent = `Unlinked ${barcode} from ${inventory[index].barcode}.`; return;
-      }
-      if (button.dataset.delete !== undefined) { inventory.splice(Number(button.dataset.delete), 1); save(); render(); status.textContent = 'Item deleted.'; }
-    });
-    qtySort.addEventListener('change', render);
-    document.getElementById('clearBtn').addEventListener('click', () => { if (!confirm('Clear all inventory items and linked barcodes?')) return; inventory = []; save(); render(); status.textContent = 'Inventory cleared.'; });
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const quote = value => '"' + String(value).replace(/"/g, '""') + '"';
-      const csv = ['Primary Barcode,Linked Barcodes,Description,Item Type,Qty', ...inventory.map(x => [x.barcode, x.aliases.join(' | '), x.description, x.type, x.qty].map(quote).join(','))].join('\n');
-      const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'})); link.download = 'inventory.csv'; link.click(); URL.revokeObjectURL(link.href);
-    });
-    async function load() {
-      try {
-        const response = await fetch('/api/data');
-        if (!response.ok) throw new Error('Could not load inventory');
-        const data = await response.json();
-        inventory = normalize(data.inventory);
-        itemTypes = [...new Set((Array.isArray(data.itemTypes) ? data.itemTypes : []).map(x => String(x).trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-      } catch (error) {
-        status.textContent = error.message;
-      }
-      render();
-    }
-    load();
-  </script>
-</body>
+    <div id="linkOverlay" class="confirmation-backdrop" hidden>
+      <section
+        class="confirmation-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="linkTitle"
+      >
+        <h2 id="linkTitle">Link a barcode</h2>
+        <p id="linkTarget"></p>
+        <form id="linkForm">
+          <label for="linkedBarcode">Scan or enter a barcode</label>
+          <input
+            id="linkedBarcode"
+            autocomplete="off"
+            maxlength="128"
+            required
+          />
+          <p class="note">Scan with Enter to link automatically.</p>
+          <p id="linkStatus" role="status"></p>
+          <div class="overlay-actions">
+            <button id="cancelLink" type="button" class="secondary">
+              Cancel
+            </button>
+            <button id="retryLink" type="button" hidden>Retry save</button>
+            <button id="submitLink" type="submit">Link barcode</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <div id="removeTypeOverlay" class="confirmation-backdrop" hidden>
+      <section
+        class="confirmation-card"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="removeTypeTitle"
+        aria-describedby="removeTypeDescription"
+      >
+        <h2 id="removeTypeTitle">Remove item type?</h2>
+        <p id="removeTypeDescription"></p>
+        <div class="overlay-actions">
+          <button id="cancelRemoveType" type="button" class="secondary">
+            Cancel
+          </button>
+          <button id="confirmRemoveType" type="button" class="danger">
+            Remove type
+          </button>
+        </div>
+      </section>
+    </div>
+  </body>
 </html>

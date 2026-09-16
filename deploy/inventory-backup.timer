@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily inventory backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=300
+Unit=inventory-backup.service
+
+[Install]
+WantedBy=timers.target

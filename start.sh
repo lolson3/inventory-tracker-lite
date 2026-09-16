@@ -1,28 +1,14 @@
 #!/usr/bin/env sh
-
 set -eu
-
-# Always run from the project directory, including under a scheduler.
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$SCRIPT_DIR"
-
 if ! command -v node >/dev/null 2>&1; then
-  echo "ERROR: Node.js is not installed or is not available in PATH." >&2
+  echo "ERROR: Install Node.js 24.15 or newer within the 24.x release line." >&2
   exit 1
 fi
-
-if ! command -v npm >/dev/null 2>&1; then
-  echo "ERROR: npm is not installed or is not available in PATH." >&2
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 15) { console.error("ERROR: Node.js 24.15+ (24.x) is required."); process.exit(1); }'
+if [ ! -f dist/server.js ] || [ ! -f dist/client/app.js ]; then
+  echo "ERROR: Build the application first: npm ci && npm run build" >&2
   exit 1
 fi
-
-if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ] || [ ! -f node_modules/typescript/bin/tsc ]; then
-  echo "Installing inventory tracker dependencies..."
-  npm ci --include=dev
-fi
-
-echo "Building Inventory Tracker Lite..."
-npm run build
-
-echo "Starting Inventory Tracker Lite..."
-exec npm start
+exec node dist/server.js

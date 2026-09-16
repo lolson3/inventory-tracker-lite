@@ -1,0 +1,28 @@
+[Unit]
+Description=Inventory Tracker Lite
+After=network.target
+
+[Service]
+Type=simple
+User=inventory
+Group=inventory
+WorkingDirectory=/opt/inventory-tracker-lite
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+Environment=DATA_DIR=/var/lib/inventory-tracker
+EnvironmentFile=/etc/inventory-tracker.env
+ExecStart=/usr/bin/node /opt/inventory-tracker-lite/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+StateDirectory=inventory-tracker
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
