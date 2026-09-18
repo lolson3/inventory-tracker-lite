@@ -11,4 +11,4 @@ if [ ! -f dist/server/server.js ] || [ ! -f dist/client/app.js ]; then
   echo "ERROR: Build the application first: npm ci && npm run build" >&2
   exit 1
 fi
-exec node dist/server/server.js
+exec node --env-file-if-exists=.env dist/server/server.js

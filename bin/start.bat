@@ -9,7 +9,7 @@ node -e "const [major, minor] = process.versions.node.split('.').map(Number); if
 if errorlevel 1 exit /b 1
 if not exist "dist\server\server.js" goto needs_build
 if not exist "dist\client\app.js" goto needs_build
-node dist\server\server.js
+node --env-file-if-exists=.env dist\server\server.js
 exit /b %errorlevel%
 :needs_build
 echo ERROR: Build the application first with npm ci and npm run build.

@@ -42,7 +42,7 @@ After building, you can also use the platform launcher:
 | Windows        | `.\bin\start.bat`   |
 | Debian / Linux | `sh ./bin/start.sh` |
 
-The launchers resolve their own working directory. They start the compiled application; run `npm run build` again after changing source files.
+The launchers resolve their own working directory and load an optional `.env` file from the project root. Variables already set in the shell or service take precedence. They start the compiled application; run `npm run build` again after changing source files.
 
 ## Using the app
 
