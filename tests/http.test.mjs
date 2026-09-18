@@ -48,8 +48,9 @@ test('security headers, explicit static routes, method restrictions and host/ori
   assert.equal(response.status, 200);
   assert.match(
     response.headers.get('content-security-policy'),
-    /frame-ancestors 'none'/,
+    /frame-ancestors \*/,
   );
+  assert.equal(response.headers.get('x-frame-options'), null);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('cache-control'), 'no-store');
   for (const path of [
@@ -106,6 +107,16 @@ test('security headers, explicit static routes, method restrictions and host/ori
     req.end();
   });
   assert.equal(lanHostStatus, 200);
+
+  const embedded = await fixture(t, {
+    embedOrigin: 'http://dashboard.local:8080',
+  });
+  const embeddedResponse = await fetch(embedded.base + '/');
+  assert.match(
+    embeddedResponse.headers.get('content-security-policy'),
+    /frame-ancestors http:\/\/dashboard\.local:8080/,
+  );
+  assert.equal(embeddedResponse.headers.get('x-frame-options'), null);
 });
 test('rejects malformed, oversized and wrong-content-type bodies without changing data', async (t) => {
   const f = await fixture(t);
@@ -186,6 +197,16 @@ test('configuration accepts LAN binding and validates optional HTTPS origins', (
     }).port,
     5174,
   );
+  assert.equal(
+    config({ EMBED_ORIGIN: 'http://dashboard.local:8080' }).embedOrigin,
+    'http://dashboard.local:8080',
+  );
+  for (const EMBED_ORIGIN of [
+    'ftp://dashboard.local',
+    'http://dashboard.local/path',
+    "http://dashboard.local'",
+  ])
+    assert.throws(() => config({ EMBED_ORIGIN }));
 });
 
 test('concurrent batches apply all increments and removal failures leave inventory unchanged', async (t) => {

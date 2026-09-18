@@ -42,10 +42,12 @@ export function createApp(options: {
   root: string;
   host?: string;
   publicOrigin?: string;
+  embedOrigin?: string;
   rateLimit?: number;
   log?: (error: unknown) => void;
 }) {
   const { store, root, publicOrigin } = options;
+  const embedOrigin = options.embedOrigin ?? '*';
   const allowsLanHosts = ['0.0.0.0', '::'].includes(
     options.host ?? '127.0.0.1',
   );
@@ -97,10 +99,9 @@ export function createApp(options: {
     async (request, response) => {
       response.setHeader(
         'Content-Security-Policy',
-        "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+        `default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors ${embedOrigin}`,
       );
       response.setHeader('X-Content-Type-Options', 'nosniff');
-      response.setHeader('X-Frame-Options', 'DENY');
       response.setHeader('Referrer-Policy', 'no-referrer');
       response.setHeader('Cache-Control', 'no-store');
       if (publicOrigin)

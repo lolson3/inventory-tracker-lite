@@ -82,6 +82,8 @@ The default listen address is `127.0.0.1`, so the app is accessible only from th
 
 The tracker has no login. Anyone who can reach the configured address can view and edit inventory, so keep it on a trusted network or protect it at the reverse proxy.
 
+The app allows iframe embedding by default. To restrict it to one dashboard, set `EMBED_ORIGIN` to the dashboard's exact origin, including its scheme and non-default port when applicable, such as `http://dashboard.example.internal:8080`. The inventory app continues to listen on port `5174` by default.
+
 ### Docker Compose
 
 The Compose configuration at `ops/docker/compose.yaml` persists the SQLite database and its backups in one named volume and binds the service to localhost by default. Start it directly for local HTTP access:

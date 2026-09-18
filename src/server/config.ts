@@ -10,10 +10,23 @@ export function config(env: NodeJS.ProcessEnv = process.env) {
     if (url.origin !== publicOrigin || url.protocol !== 'https:')
       throw new Error('PUBLIC_ORIGIN must be an HTTPS origin without a path');
   }
+  const embedOrigin = env.EMBED_ORIGIN ?? '*';
+  if (embedOrigin !== '*') {
+    const url = new URL(embedOrigin);
+    if (
+      url.origin !== embedOrigin ||
+      !['http:', 'https:'].includes(url.protocol) ||
+      /[\s"'`;]/.test(embedOrigin)
+    )
+      throw new Error(
+        'EMBED_ORIGIN must be an HTTP or HTTPS origin without a path',
+      );
+  }
   return {
     host,
     port: Number(rawPort),
     publicOrigin,
+    embedOrigin,
     dataDir: resolve(env.DATA_DIR ?? 'data'),
   };
 }
